@@ -181,11 +181,18 @@ if [[ ${baserom_type} == 'payload' ]];then
     payload-dumper-go -o build/baserom/images/ build/baserom/payload.bin >/dev/null 2>&1 ||error "分解底包 [payload.bin] 时出错" "Unpacking [payload.bin] failed"
 
 elif [[ ${is_base_rom_eu} == true ]];then
-     blue "开始分解底包 [super.img]" "Unpacking BASEROM [super.img]"
-     super_list=$(python3 bin/lpunpack.py --info build/baserom/super.img | grep "super:" | awk '{ print $5 }')
-        for i in ${super_list}; do 
-            python3 bin/lpunpack.py -p ${i} build/baserom/super.img build/baserom/images
-        done
+    blue "开始分解底包 [super.img]" "Unpacking BASEROM [super.img]"
+    super_list=$(python3 bin/lpunpack.py --info build/baserom/super.img | grep "super:" | awk '{ print $5 }')
+    for i in ${super_list}; do
+        if [[ $i == *_a ]];then
+            i=${i%_a}
+            python3 bin/lpunpack.py -p ${i}_a build/baserom/super.img build/baserom/images >/dev/null 2>&1
+            mv build/baserom/images/${i}_a.img build/baserom/images/${i}.img 
+        else
+            python3 bin/lpunpack.py -p ${i} build/baserom/super.img build/baserom/images >/dev/null 2>&1
+        fi
+    done
+    super_list=$(echo $super_list | sed 's/_a//g')
 
 elif [[ ${baserom_type} == 'br' ]];then
     super_list=$(cat build/baserom/dynamic_partitions_op_list | grep "add " | awk '{ print $2 }')
