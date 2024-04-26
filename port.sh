@@ -211,7 +211,7 @@ done
 # Move those to portrom folder. We need to pack those imgs into final port rom
 for image in vendor odm vendor_dlkm odm_dlkm;do
     if [ -f build/baserom/images/${image}.img ];then
-        cp -rf build/baserom/images/${image}.img build/portrom/images/${image}.img
+        mv -f build/baserom/images/${image}.img build/portrom/images/${image}.img
 
         # Extracting vendor at first, we need to determine which super parts to pack from Baserom fstab. 
         extract_partition build/portrom/images/${image}.img build/portrom/images/
@@ -1095,11 +1095,11 @@ fi
 blue "正在压缩 super.img" "Comprising super.img"
 zstd --rm build/portrom/images/super.img -o build/portrom/images/super.zst
 mkdir -p out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/
-mkdir -p out/${os_type}_${device_code}_${port_rom_version}/bin/windows/
+
 
 blue "正在生成刷机脚本" "Generating flashing script"
 if [[ "$is_ab_device" == false ]];then
-
+    mkdir -p out/${os_type}_${device_code}_${port_rom_version}/bin/windows/
     mv -f build/portrom/images/super.zst out/${os_type}_${device_code}_${port_rom_version}/
     #firmware
     cp -rf bin/flash/platform-tools-windows/* out/${os_type}_${device_code}_${port_rom_version}/bin/windows/
@@ -1171,13 +1171,14 @@ if [[ "$is_ab_device" == false ]];then
 else
     mkdir -p out/${os_type}_${device_code}_${port_rom_version}/images/
     mv -f build/portrom/images/super.zst out/${os_type}_${device_code}_${port_rom_version}/images/
+    mv -f build/baserom/images/*.img out/${os_type}_${device_code}_${port_rom_version}/images/
     cp -rf bin/flash/vab/update-binary out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/
     cp -rf bin/flash/vab/platform-tools-windows out/${os_type}_${device_code}_${port_rom_version}/META-INF/
     cp -rf bin/flash/vab/flash_update.bat out/${os_type}_${device_code}_${port_rom_version}/
     cp -rf bin/flash/vab/flash_and_format.bat out/${os_type}_${device_code}_${port_rom_version}/
    
     cp -rf bin/flash/zstd out/${os_type}_${device_code}_${port_rom_version}/META-INF/
-    for fwImg in $(ls out/${os_type}_${device_code}_${port_rom_version}/images/ |cut -d "." -f 1 |grep -vE "super|cust|preloader");do
+    for fwimg in $(ls out/${os_type}_${device_code}_${port_rom_version}/images/ |cut -d "." -f 1 |grep -vE "super|cust|preloader");do
         if [ "$(echo ${fwimg} |grep vbmeta)" != "" ];then
             sed -i "/rem/a META-INF\\\platform-tools-windows\\\fastboot --disable-verity --disable-verification flash "${fwimg}"_b images\/"${fwimg}".img" out/${os_type}_${device_code}_${port_rom_version}/flash_update.bat
             sed -i "/rem/a META-INF\\\platform-tools-windows\\\fastboot --disable-verity --disable-verification flash "${fwimg}"_a images\/"${fwimg}".img" out/${os_type}_${device_code}_${port_rom_version}/flash_update.bat
