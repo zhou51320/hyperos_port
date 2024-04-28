@@ -231,3 +231,23 @@ extract_partition() {
         fi
     fi    
 }
+
+disable_avb_verify() {
+    fstab=$(find $1 -name "fstab*")
+    if [[ $fstab == "" ]];then
+        error "未找到 fstab 文件！" "No fstab found!"
+        sleep 5
+    else
+        blue "禁用 AVB 验证中..." "Disabling AVB verfication...."
+        for file in $fstab; do
+            sed -i 's/,avb.*system//g' $file
+            sed -i 's/,avb,/,/g' $file
+            sed -i 's/,avb=.*a,/,/g' $file
+            sed -i 's/,avb_keys.*key//g' $file
+            if [[ "${pack_type}" == "EXT" ]];then
+                sed -i "/erofs/d" $file
+            fi
+        done
+        blue "AVB 验证禁用完成" "AVB verification disabled successfully"
+    fi
+}

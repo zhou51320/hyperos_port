@@ -952,14 +952,7 @@ fi
 
 # 去除avb校验
 blue "去除avb校验" "Disable avb verification."
-for fstab in $(find build/portrom/images/ -type f -name "fstab.*");do
-    blue "Target: $fstab"
-    sed -i "s/,avb_keys=.*avbpubkey//g" $fstab
-    sed -i "s/,avb=vbmeta_system//g" $fstab
-    sed -i "s/,avb=vbmeta_vendor//g" $fstab
-    sed -i "s/,avb=vbmeta//g" $fstab
-    sed -i "s/,avb//g" $fstab
-done
+disable_avb_verify build/portrom/images/
 
 # data 加密
 remove_data_encrypt=$(grep "remove_data_encryption" bin/port_config |cut -d '=' -f 2)
