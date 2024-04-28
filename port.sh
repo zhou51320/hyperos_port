@@ -1193,12 +1193,13 @@ if [[ "$is_ab_device" == false ]];then
         sed -i "s/boot_tv.img/$custombootimg/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
         mv -f $custom_botimg_file out/${os_type}_${device_code}_${port_rom_version}/
     fi
-    busybox unix2dos out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
     sed -i "s/portversion/${port_rom_version}/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
     sed -i "s/baseversion/${base_rom_version}/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
     sed -i "s/andVersion/${port_android_version}/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
     sed -i "s/device_code/${base_rom_code}/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
-
+    sed -i "s/device_code/${base_rom_code}/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
+    sed -i "s/device_code/${base_rom_code}/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
+    busybox unix2dos out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
 else
     mkdir -p out/${os_type}_${device_code}_${port_rom_version}/images/
     mv -f build/portrom/images/super.zst out/${os_type}_${device_code}_${port_rom_version}/images/

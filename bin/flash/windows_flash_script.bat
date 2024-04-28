@@ -42,6 +42,21 @@ if "%LANG%"=="Chinese" (
     set /p input=Please select - 1 is selected by default, and enter to execute:
 )
 
+if "%LANG%"=="Chinese" (
+    echo.
+    echo. 机型验证中...请确保您的设备代号为device_code，并已经进入bootloader模式。
+
+    echo.
+) else (
+    echo.
+    echo. Validating device...please boot your device into bootloader and make sure your device code is device_code
+    echo.
+)
+
+fastboot %* getvar product 2>&1 | findstr /r /c:"^product: *device_code" || echo Missmatching image and device
+
+fastboot %* getvar product 2>&1 | findstr /r /c:"^product: *device_code" || exit /B 1
+
 if exist boot_tv.img (
     if "%LANG%"=="Chinese" (
 	    echo. 刷入第三方boot_tv.img
@@ -70,7 +85,6 @@ if "%input%" == "2" (
 	bin\windows\fastboot.exe erase userdata
 	bin\windows\fastboot.exe erase metadata
 )
-
 REM SET_ACTION_SLOT_A_BEGIN
 if "%LANG%"=="Chinese" (
 	echo. 设置活动分区为 'a'。可能需要一些时间。请勿手动重新启动或拔掉数据线，否则可能导致设备变砖。
