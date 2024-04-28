@@ -135,8 +135,10 @@ ping 127.0.0.1 -c 5 1> /dev/null 2>&1
 
 if [ -f "boot_tv.img" ]; then
 	fastboot flash boot_ab boot_tv.img
+	fastboot flash dtbo_ab firmware-update/dtbo_tv.img
 else
 	fastboot flash boot_ab boot_official.img
+	fastboot flash dtbo_ab firmware-update/dtbo.img
 fi
 fastboot flash super super.img
 if [ ! -n "$input" ];then

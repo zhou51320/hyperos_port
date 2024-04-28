@@ -65,9 +65,11 @@ if exist boot_tv.img (
         echo. Flashing custom boot.img
     ) 
     bin\windows\fastboot.exe flash boot %~dp0boot_tv.img
+    bin\windows\fastboot.exe flash dtbo %~dp0firmware-update/dtbo_tv.img
 
 ) else (
     bin\windows\fastboot.exe flash boot %~dp0boot_official.img
+    bin\windows\fastboot.exe flash dtbo %~dp0firmware-update/dtbo.img
 )
 
 REM firmware

@@ -948,14 +948,17 @@ for anykernel_dir in tmp/anykernel*; do
         blue "开始整合第三方内核进boot.img" "Start integrating custom kernel into boot.img"
         kernel_file=$(find "$anykernel_dir" -name "Image" -exec readlink -f {} +)
         dtb_file=$(find "$anykernel_dir" -name "dtb" -exec readlink -f {} +)
-        #dtbo_img=$(find "$anykernel_dir" -name "dtbo.img" -exec readlink -f {} +)
+        dtbo_img=$(find "$anykernel_dir" -name "dtbo.img" -exec readlink -f {} +)
         if [[ "$anykernel_dir" == *"-ksu"* ]]; then
+            cp $dtbo_img ${work_dir}/devices/$base_rom_code/dtbo_ksu.img
             patch_kernel_to_bootimg "$kernel_file" "$dtb_file" "boot_ksu.img"
             blue "生成内核boot_boot_ksu.img完毕" "New boot_ksu.img generated"
         elif [[ "$anykernel_dir" == *"-noksu"* ]]; then
+            cp $dtbo_img ${work_dir}/devices/$base_rom_code/dtbo_noksu.img
             patch_kernel_to_bootimg "$kernel_file" "$dtb_file" "boot_noksu.img"
             blue "生成内核boot_noksu.img" "New boot_noksu.img generated"
         else
+            cp $dtbo_img ${work_dir}/devices/$base_rom_code/dtbo_custom.img
             patch_kernel_to_bootimg "$kernel_file" "$dtb_file" "boot_custom.img"
             blue "生成内核boot_custom.img完毕" "New boot_custom.img generated"
         fi
@@ -1140,7 +1143,9 @@ if [[ "$is_ab_device" == false ]];then
         cp -rf build/baserom/firmware-update/*  out/${os_type}_${device_code}_${port_rom_version}/firmware-update
 
          for fwimg in $(ls out/${os_type}_${device_code}_${port_rom_version}/firmware-update);do
-            if [[ ${fwimg} == "uefi_sec.mbn" ]];then
+            if [[ ${fwimg} == "dtbo.img" ]]; then
+                continue
+            elif [[ ${fwimg} == "uefi_sec.mbn" ]];then
                 part="uefisecapp"
             elif [[ ${fwimg} == "qupv3fw.elf" ]];then
                 part="qupfw"
@@ -1173,25 +1178,39 @@ if [[ "$is_ab_device" == false ]];then
     if [[ -f $nonksu_bootimg_file ]];then
         nonksubootimg=$(basename "$nonksu_bootimg_file")
         mv -f $nonksu_bootimg_file out/${os_type}_${device_code}_${port_rom_version}/
+        mv -f  devices/$base_rom_code/dtbo_noksu.img out/${os_type}_${device_code}_${port_rom_version}/firmware-update/dtbo_noksu.img
         sed -i "s/boot_official.img/$nonksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
         sed -i "s/boot_official.img/$nonksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
         sed -i "s/boot_official.img/$nonksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
+        sed -i "s/dtbo.img/dtbo_noksu.img/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
+        sed -i "s/dtbo.img/dtbo_noksu.img/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
+        sed -i "s/dtbo.img/dtbo_noksu.img/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
     else
         cp -f build/baserom/boot.img out/${os_type}_${device_code}_${port_rom_version}/boot_official.img
     fi
 
     if [[ -f "$ksu_bootimg_file" ]];then
         ksubootimg=$(basename "$ksu_bootimg_file")
+        mv -f $ksu_bootimg_file out/${os_type}_${device_code}_${port_rom_version}/
+        mv -f  devices/$base_rom_code/dtbo_ksu.img out/${os_type}_${device_code}_${port_rom_version}/firmware-update/dtbo_ksu.img
         sed -i "s/boot_tv.img/$ksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
         sed -i "s/boot_tv.img/$ksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
         sed -i "s/boot_tv.img/$ksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
-        mv -f $ksu_bootimg_file out/${os_type}_${device_code}_${port_rom_version}/
+        sed -i "s/dtbo_tv.img/dtbo_ksu.img/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
+        sed -i "s/dtbo_tv.img/dtbo_ksu.img/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
+        sed -i "s/dtbo_tv.img/dtbo_ksu.img/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
+        
     elif [[ -f "$custom_bootimg_file" ]];then
         custombootimg=$(basename "$custom_botimg_file")
+        mv -f $custom_botimg_file out/${os_type}_${device_code}_${port_rom_version}/
+        mv -f  devices/$base_rom_code/dtbo_custom.img out/${os_type}_${device_code}_${port_rom_version}/firmware-update/dtbo_custom.img
         sed -i "s/boot_tv.img/$custombootimg/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
         sed -i "s/boot_tv.img/$custombootimg/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
         sed -i "s/boot_tv.img/$custombootimg/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
-        mv -f $custom_botimg_file out/${os_type}_${device_code}_${port_rom_version}/
+        sed -i "s/dtbo_tv.img/dtbo_custom.img/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
+        sed -i "s/dtbo_tv.img/dtbo_custom.img/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
+        sed -i "s/dtbo_tv.img/dtbo_custom.img/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
+        
     fi
     sed -i "s/portversion/${port_rom_version}/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
     sed -i "s/baseversion/${base_rom_version}/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
