@@ -104,15 +104,15 @@ if [ -f "super.zst" ];then
 fi
 
 if [ "$LANG" = "C.UTF-8" ];then
-	    echo "机型验证中...请确保您的设备代号为[device_code]，并已经进入bootloader模式。"
-	elif [ "$LANG" = "zh_CN.UTF-8" ];then
-	    echo "机型验证中...请确保您的设备代号为[device_code]，并已经进入bootloader模式。"
-	elif [[ "$LANG" =~ ^zh_.*\.UTF-8$ ]]; then
-	    echo "機型驗證中...請確保您的設備代號為[device_code]，並已進入bootloader模式。"
-	else
-	    echo "Validating device...please boot your device into bootloader and make sure your device code is [device_code]"
-	fi
+	echo "机型验证中...请确保您的设备代号为[device_code]，并已经进入bootloader模式。"
+elif [ "$LANG" = "zh_CN.UTF-8" ];then
+	echo "机型验证中...请确保您的设备代号为[device_code]，并已经进入bootloader模式。"
+elif [[ "$LANG" =~ ^zh_.*\.UTF-8$ ]]; then
+	echo "機型驗證中...請確保您的設備代號為[device_code]，並已進入bootloader模式。"
+else
+	echo "Validating device...please boot your device into bootloader and make sure your device code is [device_code]"
 fi
+
 fastboot $* getvar product 2>&1 | grep "^product: *device_code"
 if [ $? -ne 0  ] ; then
 	if [ "$LANG" = "C.UTF-8" ];then
