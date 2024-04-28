@@ -931,6 +931,38 @@ else
     yellow "devices/${base_rom_code}/overlay 未找到" "devices/${base_rom_code}/overlay not found" 
 fi
 
+for zip in $(find devices/${base_rom_code}/ -name "*.zip"); do
+    if unzip -l $zip | grep -q "anykernel.sh" ;then
+        blue "检查到第三方内核压缩包 $zip [AnyKernel类型]" "Custom Kernel zip $zip detected [Anykernel]"
+        if echo $zip | grep -q ".*-KSU" ; then
+          unzip $zip -d tmp/anykernel-ksu/ > /dev/null 2>&1
+        elif echo $zip | grep -q ".*-NoKSU" ; then
+          unzip $zip -d tmp/anykernel-noksu/ > /dev/null 2>&1
+        else
+          unzip $zip -d tmp/anykernel/ > /dev/null 2>&1
+        fi
+    fi
+done
+for anykernel_dir in tmp/anykernel*; do
+    if [ -d "$anykernel_dir" ]; then
+        blue "开始整合第三方内核进boot.img" "Start integrating custom kernel into boot.img"
+        kernel_file=$(find "$anykernel_dir" -name "Image" -exec readlink -f {} +)
+        dtb_file=$(find "$anykernel_dir" -name "dtb" -exec readlink -f {} +)
+        #dtbo_img=$(find "$anykernel_dir" -name "dtbo.img" -exec readlink -f {} +)
+        if [[ "$anykernel_dir" == *"-ksu"* ]]; then
+            patch_kernel_to_bootimg "$kernel_file" "$dtb_file" "boot_ksu.img"
+            blue "生成内核boot_boot_ksu.img完毕" "New boot_ksu.img generated"
+        elif [[ "$anykernel_dir" == *"-noksu"* ]]; then
+            patch_kernel_to_bootimg "$kernel_file" "$dtb_file" "boot_noksu.img"
+            blue "生成内核boot_noksu.img" "New boot_noksu.img generated"
+        else
+            patch_kernel_to_bootimg "$kernel_file" "$dtb_file" "boot_custom.img"
+            blue "生成内核boot_custom.img完毕" "New boot_custom.img generated"
+        fi
+    fi
+    rm -rf $anykernel_dir
+done
+
 #添加erofs文件系统fstab
 if [ ${pack_type} == "EROFS" ];then
     yellow "检查 vendor fstab.qcom是否需要添加erofs挂载点" "Validating whether adding erofs mount points is needed."
@@ -1135,12 +1167,12 @@ if [[ "$is_ab_device" == false ]];then
     done
     cp -rf bin/flash/a-only/update-binary out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/
     cp -rf bin/flash/zstd out/${os_type}_${device_code}_${port_rom_version}/META-INF/
-    ksu_bootimg_file=$(find devices/$base_rom_code/ -type f -name "boot_ksu*.img")
-    nonksu_bootimg_file=$(find devices/$base_rom_code/ -type f -name "boot_nonksu*.img")
-
+    ksu_bootimg_file=$(find devices/$base_rom_code/ -type f -name "*boot_ksu.img")
+    nonksu_bootimg_file=$(find devices/$base_rom_code/ -type f -name "*boot_noksu.img")
+    custom_bootimg_file=$(find devices/$base_rom_code/ -type f -name "*boot_custom.img")
     if [[ -f $nonksu_bootimg_file ]];then
         nonksubootimg=$(basename "$nonksu_bootimg_file")
-        cp -f $nonksu_bootimg_file out/${os_type}_${device_code}_${port_rom_version}/
+        mv -f $nonksu_bootimg_file out/${os_type}_${device_code}_${port_rom_version}/
         sed -i "s/boot_official.img/$nonksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
         sed -i "s/boot_official.img/$nonksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
         sed -i "s/boot_official.img/$nonksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
@@ -1153,7 +1185,13 @@ if [[ "$is_ab_device" == false ]];then
         sed -i "s/boot_tv.img/$ksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
         sed -i "s/boot_tv.img/$ksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
         sed -i "s/boot_tv.img/$ksubootimg/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
-        cp -rf $ksu_bootimg_file out/${os_type}_${device_code}_${port_rom_version}/
+        mv -f $ksu_bootimg_file out/${os_type}_${device_code}_${port_rom_version}/
+    elif [[ -f "$custom_bootimg_file" ]];then
+        custombootimg=$(basename "$custom_botimg_file")
+        sed -i "s/boot_tv.img/$custombootimg/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary
+        sed -i "s/boot_tv.img/$custombootimg/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
+        sed -i "s/boot_tv.img/$custombootimg/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
+        mv -f $custom_botimg_file out/${os_type}_${device_code}_${port_rom_version}/
     fi
     busybox unix2dos out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
     sed -i "s/portversion/${port_rom_version}/g" out/${os_type}_${device_code}_${port_rom_version}/META-INF/com/google/android/update-binary

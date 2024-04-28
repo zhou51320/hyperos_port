@@ -251,3 +251,66 @@ disable_avb_verify() {
         blue "AVB 验证禁用完成" "AVB verification disabled successfully"
     fi
 }
+
+patch_kernel_to_bootimg() {
+    kernel_file=$1
+    dtb_file=$2
+    bootimg_name=$3
+    mkdir -p ${work_dir}/tmp/boot
+    cd ${work_dir}/tmp/boot
+    cp ${work_dir}/build/baserom/boot.img ${work_dir}/tmp/boot/boot.img
+    magiskboot unpack -h ${work_dir}/tmp/boot/boot.img > /dev/null 2>&1
+    if [ -f ramdisk.cpio ]; then
+    comp=$(magiskboot decompress ramdisk.cpio | grep -v 'raw' | sed -n 's;.*\[\(.*\)\];\1;p')
+    if [ "$comp" ]; then
+        mv -f ramdisk.cpio ramdisk.cpio.$comp
+        magiskboot decompress ramdisk.cpio.$comp ramdisk.cpio > /dev/null 2>&1
+        if [ $? != 0 ] && $comp --help; then
+        $comp -dc ramdisk.cpio.$comp >ramdisk.cpio
+        fi
+    fi
+    mkdir -p ramdisk
+    chmod 755 ramdisk
+    cd ramdisk
+    EXTRACT_UNSAFE_SYMLINKS=1 cpio -d -F ../ramdisk.cpio -i
+    disable_avb_verify ${work_dir}/tmp/boot/
+    #添加erofs文件系统fstab
+    if [[ ${pack_type} == "EROFS" ]];then
+        blue "检查 ramdisk fstab.qcom是否需要添加erofs挂载点" "Check if ramdisk fstab.qcom needs to add erofs mount point."
+        if ! grep -q "erofs" ${work_dir}/tmp/boot/ramdisk/fstab.qcom ; then
+                for pname in ${super_list}; do
+                    sed -i "/\/${pname}[[:space:]]\+ext4/{p;s/ext4/erofs/;s/ro,barrier=1,discard/ro/;}" ${work_dir}/tmp/boot/ramdisk/fstab.qcom
+                    added_line=$(sed -n "/\/${pname}[[:space:]]\+erofs/p" ${work_dir}/tmp/boot/ramdisk/fstab.qcom)
+    
+                    if [ -n "$added_line" ]; then
+                        yellow "添加${pname}成功" "Adding erofs mount point [$pname]"
+                    else
+                        error "添加失败，请检查" "Adding faild, please check."
+                        exit 1 
+                    fi
+                done
+          fi
+      fi
+    fi
+    sudo cp -f $kernel_file ${work_dir}/tmp/boot/kernel
+    sudo cp -f $dtb_file ${work_dir}/tmp/boot/dtb
+    cd ${work_dir}/tmp/boot/ramdisk/
+    find | sed 1d | cpio -H newc -R 0:0 -o -F ../ramdisk_new.cpio > /dev/null 2>&1
+    cd ..
+    if [ "$comp" ]; then
+      magiskboot compress=$comp ramdisk_new.cpio
+      if [ $? != 0 ] && $comp --help > /dev/null 2>&1; then
+          $comp -9c ramdisk_new.cpio >ramdisk.cpio.$comp
+      fi
+    fi
+    ramdisk=$(ls ramdisk_new.cpio* | tail -n1)
+    if [ "$ramdisk" ]; then
+      cp -f $ramdisk ramdisk.cpio
+      case $comp in
+      cpio) nocompflag="-n" ;;
+      esac
+      magiskboot repack $nocompflag ${work_dir}/tmp/boot/boot.img ${work_dir}/devices/$base_rom_code/${bootimg_name} >/dev/null 2>&1
+    fi
+    rm -rf ${work_dir}/tmp/boot
+    cd $work_dir
+}
