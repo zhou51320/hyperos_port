@@ -91,10 +91,13 @@ fi
 blue "正在检测ROM底包" "Validating BASEROM.."
 if unzip -l ${baserom} | grep -q "payload.bin"; then
     baserom_type="payload"
+    green "检测到payload.bin文件" "Found payload.bin file"
     super_list="vendor mi_ext odm odm_dlkm system system_dlkm vendor_dlkm product product_dlkm system_ext"
 elif unzip -l ${baserom} | grep -q "br$";then
     baserom_type="br"
+    green "检测到broli文件" "Found broli file"
 elif unzip -l ${baserom} | grep -q "images/super.img*"; then
+    green "检测到super.img.*文件" "Found super.img.* files"
     is_base_rom_eu=true
 else
     error "底包中未发现payload.bin以及br文件，请使用MIUI官方包后重试" "payload.bin/new.br not found, please use HyperOS official OTA zip package."
@@ -102,13 +105,27 @@ else
 fi
 
 blue "开始检测ROM移植包" "Validating PORTROM.."
-if unzip -l ${portrom} | grep  -q "payload.bin"; then
-    green "ROM初步检测通过" "ROM validation passed."
-elif [[ ${portrom} == *"xiaomi.eu"* ]];then
+case "${portrom}" in
+    *.zip)
+        if unzip -l "${portrom}" | grep -q "payload.bin"; then
+            green "检测到payload.bin文件" "Found payload.bin file"
+        elif [[ "${portrom}" == *"xiaomi.eu"* ]] && (unzip -l ${baserom} | grep -q "images/super.img*") ; then
+            green "检测到super.img.*文件" "Found super.img.* files"
     is_eu_rom=true
 else
-    error "目标移植包没有payload.bin，请用MIUI官方包作为移植包" "payload.bin not found, please use HyperOS official OTA zip package."
-fi
+            error "目标移植包不是有效的ZIP文件，请检查文件格式。" "The target port package is not a valid ZIP file, please check the file format."
+            exit
+        fi
+        ;;
+    *.tgz)
+        # FIXME: Checking if the .tgz contains super.img is very time-consuming, so just skip it here for now.
+        green "跳过检查tgz" "Skip validating tgz file"
+        portrom_type="fastboot"
+        ;;
+    *)
+        error "目标移植包不是有效的ZIP或TGZ文件，请检查文件格式。" "The target port package is not a valid ZIP or TGZ file, please check the file format."
+        ;;
+esac
 
 green "ROM初步检测通过" "ROM validation passed."
 
@@ -168,6 +185,15 @@ if [[ ${is_eu_rom} == true ]];then
     simg2img build/portrom/images/super.img.* build/portrom/images/super.img
     rm -rf build/portrom/images/super.img.*
     mv build/portrom/images/super.img build/portrom/super.img
+    green "移植包 [super.img] 提取完毕" "[super.img] extracted."
+elif [[ ${portrom_type} == "fastboot" ]];then
+    blue "正在提取移植包 [super.img]" "Extracting files from PORTROM [super.img]"
+    mkdir -p tmp/image
+    tar -xzf ${portrom} -C tmp/image  ||error "解压移植包 [super.img] 时出错"  "Extracting [super.img] error"
+    superimg=$(find tmp -type f -name "super.img")
+    mv ${superimg} build/portrom/images/super.img.sparse
+    simg2img build/portrom/images/super.img.sparse build/portrom/super.img
+    rm -rf build/portrom/images/super.img.sparse
     green "移植包 [super.img] 提取完毕" "[super.img] extracted."
 else
     blue "正在提取移植包 [payload.bin]" "Extracting files from PORTROM [payload.bin]"
@@ -230,7 +256,12 @@ for part in ${super_list};do
     if [[ ! -d build/portrom/images/${part} ]]; then
         if [[ ${is_eu_rom} == true ]];then
             blue "PORTROM super.img 提取 [${part}] 分区..." "Extracting [${part}] from PORTROM super.img"
-            blue "lpunpack.py PORTROM super.img ${patrt}_a"
+            blue "lpunpack.py PORTROM super.img ${part}_a"
+            python3 bin/lpunpack.py -p ${part}_a build/portrom/super.img build/portrom/images 
+            mv build/portrom/images/${part}_a.img build/portrom/images/${part}.img
+        elif [[ ${portrom_type} == "fastboot" ]];then
+            blue "PORTROM super.img 提取 [${part}] 分区..." "Extracting [${part}] from PORTROM super.img"
+            blue "lpunpack.py PORTROM super.img ${part}_a"
             python3 bin/lpunpack.py -p ${part}_a build/portrom/super.img build/portrom/images 
             mv build/portrom/images/${part}_a.img build/portrom/images/${part}.img
         else
@@ -266,7 +297,7 @@ port_mios_version_incremental=$(< build/portrom/images/mi_ext/etc/build.prop gre
 
 port_device_code=$(echo $port_mios_version_incremental | cut -d "." -f 5)
 
-if [[ $port_mios_version_incremental == *DEV* ]];then
+if [[ $port_mios_version_incremental == *DEV* ]] || [[ ${portrom_type} == "fastboot" ]];then
     yellow "检测到开发板，跳过修改版本代码" "Dev deteced,skip replacing codename"
     port_rom_version=$(echo $port_mios_version_incremental)
 else
@@ -517,10 +548,9 @@ else
 fi
 
 
+
+if [[ ${port_rom_code} != "sheng" ]] || [[ ${port_rom_code} != "shennong" ]];then
 blue "左侧挖孔灵动岛修复" "StrongToast UI fix"
-if [[ "$is_shennong_houji_port" == true ]];then
-    patch_smali "MiuiSystemUI.apk" "MIUIStrongToast\$2.smali" "const\/4 v7\, 0x0" "iget-object v7\, v1\, Lcom\/android\/systemui\/toast\/MIUIStrongToast;->mRLLeft:Landroid\/widget\/RelativeLayout;\\n\\tinvoke-virtual {v7}, Landroid\/widget\/RelativeLayout;->getLeft()I\\n\\tmove-result v7\\n\\tint-to-float v7,v7"
-else
     patch_smali "MiuiSystemUI.apk" "MIUIStrongToast\$2.smali" "const\/4 v9\, 0x0" "iget-object v9\, v1\, Lcom\/android\/systemui\/toast\/MIUIStrongToast;->mRLLeft:Landroid\/widget\/RelativeLayout;\\n\\tinvoke-virtual {v9}, Landroid\/widget\/RelativeLayout;->getLeft()I\\n\\tmove-result v9\\n\\tint-to-float v9,v9"
 fi
 
@@ -532,7 +562,8 @@ fi
 if [[ ${is_eu_rom} == "true" ]];then
     patch_smali "miui-services.jar" "SystemServerImpl.smali" ".method public constructor <init>()V/,/.end method" ".method public constructor <init>()V\n\t.registers 1\n\tinvoke-direct {p0}, Lcom\/android\/server\/SystemServerStub;-><init>()V\n\n\treturn-void\n.end method" "regex"
 
-else    
+elif [[ ${port_rom_code} != "sheng" ]] || [[ ${port_rom_code} != "shennong" ]];then
+    
     if [[ ! -d tmp ]];then
         mkdir -p tmp/
     fi
@@ -665,7 +696,7 @@ for i in $(find build/portrom/images -type f -name "build.prop");do
     sed -i "s/ro.product.system_ext.device=.*/ro.product.system_ext.device=${base_rom_code}/g" ${i}
     sed -i "s/persist.sys.timezone=.*/persist.sys.timezone=Asia\/Shanghai/g" ${i}
     #全局替换device_code
-    if [[ $port_mios_version_incremental != *DEV* ]];then
+    if [[ $port_mios_version_incremental != *DEV* ]] || [[ ${port_rom_code} != "sheng" ]] || [[ ${port_rom_code} != "shennong" ]];then
         sed -i "s/$port_device_code/$base_device_code/g" ${i}
     fi
     # 添加build user信息
@@ -798,6 +829,13 @@ if [[ ${port_rom_code} == "munch_cn" ]];then
     sed -i 's|<permission name="android.permission.SYSTEM_CAMERA" />|<permission name="android.permission.SYSTEM_CAMERA" />\n\t\t<permission name="android.permission.TURN_SCREEN_ON" />|' build/portrom/images/product/etc/permissions/privapp-permissions-product.xml
 
 fi
+
+if [[ ${port_rom_code} == "sheng" ]];then
+    for perm in build/portrom/images/vendor/etc/permissions/android.hardware.telephony.cdma.xml build/portrom/images/vendor/etc/permissions/android.hardware.telephony.gsm.xml;do
+        sed -i 's|<feature name="android.hardware.telephony" />|<feature name="android.hardware.telephony" />\n\t<feature name="android.software.telecom" />\n\t<feature name="android.hardware.telephony.radio.access" />\n\t<feature name="android.hardware.telephony.subscription" />\n\t<feature name="android.hardware.telephony.calling" />\n\t<feature name="android.hardware.telephony.data" />\n\t<feature name="android.hardware.telephony.messaging" />|' ${perm}
+    done
+fi
+
 #自定义替换
 
 #Add perfect icons
@@ -830,7 +868,7 @@ if ! is_property_exists ro.miui.surfaceflinger_affinity build/portrom/images/pro
 fi
 
 #自定义替换
-if [[ ${port_rom_code} == "dagu_cn" ]];then
+if [[ ${port_rom_code} == "dagu_cn" ]] || [[ ${port_rom_code} == "sheng" ]];then
     echo "ro.control_privapp_permissions=log" >> build/portrom/images/product/etc/build.prop
     
     rm -rf build/portrom/images/product/overlay/MiuiSystemUIResOverlay.apk
@@ -870,11 +908,21 @@ if [[ ${port_rom_code} == "dagu_cn" ]];then
 
     if [[ -d devices/pad/overlay/product/app ]];then
         for app in $(ls devices/pad/overlay/product/app); do
-            targetAppfolder = $(find build/portrom/images/product/app -type d -name *"$app"* )
+            targetAppfolder=$(find build/portrom/images/product/app -type d -name *"$app"* )
             if [ -d $targetAppfolder ]; then
                 rm -rfv $targetAppfolder
             fi
             cp -rf devices/pad/overlay/product/app/$app build/portrom/images/product/app/
+        done
+    fi
+
+    if [[ -d devices/pad/overlay/product/data-app ]];then
+        for app in $(ls devices/pad/overlay/product/data-app); do
+            targetAppfolder=$(find build/portrom/images/product/data-app -type d -name *"$app"* )
+            if [ -d $targetAppfolder ]; then
+                rm -rfv $targetAppfolder
+            fi
+            cp -rf devices/pad/overlay/product/data-app/$app build/portrom/images/product/data-app/
         done
     fi
 
