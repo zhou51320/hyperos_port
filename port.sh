@@ -822,6 +822,47 @@ fi
 unlock_device_feature "default rhythmic eyecare mode" "integer" "default_eyecare_mode" "2"
 unlock_device_feature "default texture for paper eyecare" "integer" "paper_eyecare_default_texture" "0"
 
+# Unlock Celluar Sharing feature
+targetMiuiFrameworkResOverlay=$(find build/portrom/images/product -type f -name "MiuiFrameworkResOverlay.apk")
+if [[ -f $targetMiuiFrameworkResOverlay ]]; then
+    mkdir tmp/  > /dev/null 2>&1
+    targetFrameworkExtRes=$(find build/portrom/images/system_ext -type f -name "framework-ext-res.apk")
+    bin/apktool/apktool d $targetFrameworkExtRes -o tmp/framework-ext-res -f > /dev/null 2>&1
+    if grep -r config_celluar_shared_support tmp/framework-ext-res/ ; then  
+        filename=$(basename $targetMiuiFrameworkResOverlay)
+        yellow "开启通信共享功能" "Enable Celluar Sharing feature"
+        targetDir=$(echo "$filename" | sed 's/\..*$//')
+        bin/apktool/apktool d $targetMiuiFrameworkResOverlay -o tmp/$targetDir -f > /dev/null 2>&1
+        bool_xml=$(find tmp/$targetDir -type f -name "bools.xml")
+        if ! xmlstarlet sel -t -c "//bool[@name='config_celluar_shared_support']" "$bool_xml" | grep -q '<bool'; then
+            blue "bools.xml: 布尔值config_celluar_shared_support未找到，正在添加..." "bools.xml: Boolean value config_celluar_shared_support not found, adding it..."
+            xmlstarlet ed -L -s /resources -t elem -n bool -v "true" \
+            -i "//bool[not(@name)]" -t attr -n name -v "config_celluar_shared_support" $bool_xml
+        fi
+        public_xml=$(find tmp/$targetDir -type f -name "public.xml")
+        
+        LAST_ID=$(xmlstarlet sel -t -m "//public[@type='bool'][last()]" -v "@id" "$public_xml")
+
+        if [ -z "$LAST_ID" ]; then
+            blue "在 public.xml 中未找到布尔值，分配config_celluar_shared_support默认 ID: 0x7f020000" "Boolean value not found in public.xml, assigning default ID: 0x7f020000"
+            NEW_ID_HEX="0x7f020000"
+        else
+            blue "public.xml: 找到最后一个布尔值 ID: $LAST_ID" "public.xml: Last boolean value ID $LAST_ID found"
+            LAST_ID_DEC=$((LAST_ID))
+            NEW_ID_DEC=$((LAST_ID_DEC + 1))
+            NEW_ID_HEX=$(printf "0x%08x" "$NEW_ID_DEC")
+            blue "public.xml: 分配config_celluar_shared_support新ID: $NEW_ID_HEX" "public.xml: Assigning new ID: $NEW_ID_HEX to config_celluar_shared_support"
+        fi
+        xmlstarlet ed -L -s /resources -t elem -n public -v "" \
+            -i "//public[not(@type)]" -t attr -n type -v "bool" \
+            -i "//public[not(@name)]" -t attr -n name -v "config_celluar_shared_support" \
+            -i "//public[not(@id)]" -t attr -n id -v "$NEW_ID_HEX" "$public_xml"
+
+        bin/apktool/apktool b tmp/$targetDir -o tmp/$filename > /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
+        cp -rf tmp/$filename $targetMiuiFrameworkResOverlay
+        rm -rf tmp
+    fi
+fi
 
 if [[ ${port_rom_code} == "munch_cn" ]];then
     # Add missing camera permission android.permission.TURN_SCREEN_ON
