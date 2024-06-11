@@ -696,7 +696,7 @@ for i in $(find build/portrom/images -type f -name "build.prop");do
     sed -i "s/ro.product.system_ext.device=.*/ro.product.system_ext.device=${base_rom_code}/g" ${i}
     sed -i "s/persist.sys.timezone=.*/persist.sys.timezone=Asia\/Shanghai/g" ${i}
     #全局替换device_code
-    if [[ $port_mios_version_incremental != *DEV* ]] || [[ ${port_rom_code} != "sheng" ]] || [[ ${port_rom_code} != "shennong" ]];then
+    if [[ $port_mios_version_incremental != *DEV* ]];then
         sed -i "s/$port_device_code/$base_device_code/g" ${i}
     fi
     # 添加build user信息
