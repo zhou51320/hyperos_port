@@ -414,14 +414,13 @@ cp -rf build/baserom/images/product/etc/device_features/* build/portrom/images/p
 if [[ ${is_eu_rom} == "true" ]];then
     cp -rf build/baserom/images/product/etc/device_info.json build/portrom/images/product/etc/device_info.json
 fi
-# MiSound
-#baseMiSound=$(find build/baserom/images/product -type d -name "MiSound")
-#portMiSound=$(find build/baserom/images/product -type d -name "MiSound")
-#if [ -d ${baseMiSound} ] && [ -d ${portMiSound} ];then
-#    blue "正在替换 MiSound"
- #   rm -rf ./${portMiSound}/*
- #   cp -rf ./${baseMiSound}/* ${portMiSound}/
-#fi
+baseMiSound=$(find build/baserom/images/product -type d -name "MiSound")
+portMiSound=$(find build/portrom/images/product -type d -name "MiSound")
+if [ -d ${baseMiSound} ] && [ -d ${portMiSound} ];then
+   blue "正在替换 MiSound" "Replacing stock MiSound"
+   rm -rf ./${portMiSound}/*
+   cp -rf ./${baseMiSound}/* ${portMiSound}/
+fi
 
 # MusicFX
 #baseMusicFX=$(find build/baserom/images/product build/baserom/images/system -type d -name "MusicFX")
