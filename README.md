@@ -1,7 +1,6 @@
 <div align="center">
 
 # HyperOS 移植项目
-### 基于 https://github.com/ljc-fight/miui_port
 
 简体中文&nbsp;&nbsp;|&nbsp;&nbsp;[English](/README_en-US.md) 
 
@@ -9,10 +8,10 @@
 
 ## 简介
 - HyperOS 一键自动移植打包
-
+- 支持A-only和AB机型
 
 ## 测试机型及版本
-- 测试机型小米10/Pro/Ultra MIUI 14最新版
+- 测试机型小米10/Pro/Ultra, 小米10S HyperOS最新版
 - 测试版本 小米12、小米13/Pro/Ultra、小米14/Pro HyperOS1.0 正式版和开发版 官方OTA包 & xiaomi.eu官改包
 - 测试版本 小米平板5 Pro 12.4（DAGU）
 
@@ -35,8 +34,8 @@
 - 等你发现
 
 ## 说明
-- 以上CN ROM均基于小米10正式版(V14.0.4.0.TJBCNXM)底包
-- 欧版基于最新xiaomi.eu官方的最新MIUI14底包
+- 以上CN ROM均基于小米正式版官方HyperOS(A13)底包
+- 欧版基于最新xiaomi.eu官方的最新HyperOS底包
 
 ## 平板系统
 移植平板HyperOS到手机，需要从其他正常手机HyperOS机型复制下面的软件

@@ -12,7 +12,7 @@
 - HyperOS Porting Project for Android 13 devices "Onekey" script
 
 ## Tested devices and portroms
-- Tested Devices: Xiaomi 10/Pro/Ultra(umi/cmi/cas) (with latest stock/xiaomi.eu MIUI14 ROM)
+- Tested Devices: Xiaomi 10/Pro/Ultra/s(umi/cmi/cas/thyme) (with latest stock/xiaomi.eu HyperOS A13 ROM)
 - Tested Ports: Xiaomi Mi 13/13Pro/14/14Pro K70Pro Stable and Dev stock flashable zip、xiaomi.eu latest HyperOS ROM
 
 ## Working
@@ -29,7 +29,7 @@
 - When unlocking device, the screen may flicker , Enabling "Disable HW overlays" in Developer options may help.
 
 ## Description
-- All the above testing is based on Xiaomi 10/10Pro/10 Ultra official/xiaomi.eu MIUI 14 version. for V-AB devices, tester needed. 
+- All the above testing is based on Xiaomi 10/10Pro/10 Ultra/s official/xiaomi.eu HyperOS version. both A-onlay and  V-AB devices supported. 
 
 ## How to use
 - On WSL、ubuntu、deepin and other Linux
