@@ -1142,7 +1142,7 @@ for pname in ${super_list};do
                 python3 bin/fspatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_fs_config
                 python3 bin/contextpatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_file_contexts
                 #sudo perl -pi -e 's/\\@/@/g' build/portrom/images/config/${pname}_file_contexts
-                mkfs.erofs -zlz4hc,9 --mount-point ${pname} --fs-config-file build/portrom/images/config/${pname}_fs_config --file-contexts build/portrom/images/config/${pname}_file_contexts build/portrom/images/${pname}.img build/portrom/images/${pname}
+        mkfs.erofs -zlz4hc,9 --mount-point /${pname} --fs-config-file build/portrom/images/config/${pname}_fs_config --file-contexts build/portrom/images/config/${pname}_file_contexts build/portrom/images/${pname}.img build/portrom/images/${pname}
                 if [ -f "build/portrom/images/${pname}.img" ];then
                     green "成功以 [erofs] 文件系统打包 [${pname}.img]" "Packing [${pname}.img] successfully with [erofs] format"
                     #rm -rf build/portrom/images/${pname}
