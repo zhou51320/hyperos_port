@@ -299,9 +299,12 @@ port_device_code=$(echo $port_mios_version_incremental | cut -d "." -f 5)
 
 if [[ $port_mios_version_incremental == *DEV* ]] || [[ ${portrom_type} == "fastboot" ]];then
     yellow "检测到开发板，跳过修改版本代码" "Dev deteced,skip replacing codename"
-    port_rom_version=$(echo $port_mios_version_incremental)
-else
+    port_rom_version="$(echo $port_mios_version_incremental)"
+elif [[ $port_android_version == "14" ]];then
     base_device_code=U$(echo $base_rom_version | cut -d "." -f 5 | cut -c 2-)
+    port_rom_version=$(echo $port_mios_version_incremental | sed "s/$port_device_code/$base_device_code/")
+elif [[ $port_android_version == "15" ]];then
+    base_device_code=V$(echo $base_rom_version | cut -d "." -f 5 | cut -c 2-)
     port_rom_version=$(echo $port_mios_version_incremental | sed "s/$port_device_code/$base_device_code/")
 fi
 green "ROM 版本: 底包为 [${base_rom_version}], 移植包为 [${port_rom_version}]" "ROM Version: BASEROM: [${base_rom_version}], PORTROM: [${port_rom_version}] "
@@ -311,6 +314,7 @@ base_rom_code=$(< build/portrom/images/vendor/build.prop grep "ro.product.vendor
 port_rom_code=$(< build/portrom/images/product/etc/build.prop grep "ro.product.product.name" |awk 'NR==1' |cut -d '=' -f 2)
 green "机型代号: 底包为 [${base_rom_code}], 移植包为 [${port_rom_code}]" "Device Code: BASEROM: [${base_rom_code}], PORTROM: [${port_rom_code}]"
 
+port_release_codename=$(< build/portrom/images/system/system/build.prop grep "ro.build.version.release_or_codename" | awk 'NR=1' | cut -d '=' -f 2)
 if grep -q "ro.build.ab_update=true" build/portrom/images/vendor/build.prop;  then
     is_ab_device=true
 else
@@ -480,6 +484,14 @@ if [[ -f $targetAospFrameworkResOverlay ]]; then
         # magic: Change DefaultPeakRefrshRate to 60 
         xmlstarlet ed -L -u "//integer[@name='config_defaultPeakRefreshRate']/text()" -v 60 $xml
     done
+    if [[ $port_android_version == "15" ]]; then
+        blue "Fix VanillaIceCream brightness" 
+        for xml in $(find tmp/$targetDir -type f -name "*.xml");do
+            sed -i "s/config_screenBrightnessSettingDefault/config_screenBrightnessSettingDefault_hyper/g" $xml
+            sed -i "s/config_screenBrightnessSettingMaximum/config_screenBrightnessSettingMaximum_hyper/g" $xml
+            sed -i "s/config_screenBrightnessSettingMinimum/config_screenBrightnessSettingMinimum_hyper/g" $xml 
+        done 
+    fi
     bin/apktool/apktool b tmp/$targetDir -o tmp/$filename > /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
     cp -rf tmp/$filename $targetAospFrameworkResOverlay
 fi
@@ -810,12 +822,16 @@ fi
 
 unlock_device_feature "whether support fps change " "bool" "support_smart_fps"
 unlock_device_feature "smart fps value" "integer" "smart_fps_value" "${maxFps}"
+if [[ ${port_android_version} != "15" ]];then
 patch_smali "PowerKeeper.apk" "DisplayFrameSetting.smali" "unicorn" "umi"
+fi
 if [[ ${is_eu_rom} == true ]];then
     patch_smali "MiSettings.apk" "NewRefreshRateFragment.smali" "const-string v1, \"btn_preferce_category\"" "const-string v1, \"btn_preferce_category\"\n\n\tconst\/16 p1, 0x1"
 
 else
+    if [[ ${port_android_version} != "15" ]];then
     patch_smali "MISettings.apk" "NewRefreshRateFragment.smali" "const-string v1, \"btn_preferce_category\"" "const-string v1, \"btn_preferce_category\"\n\n\tconst\/16 p1, 0x1"
+    fi
 fi
 # Unlock eyecare mode 
 unlock_device_feature "default rhythmic eyecare mode" "integer" "default_eyecare_mode" "2"
@@ -826,7 +842,7 @@ targetMiuiFrameworkResOverlay=$(find build/portrom/images/product -type f -name 
 if [[ -f $targetMiuiFrameworkResOverlay ]]; then
     mkdir tmp/  > /dev/null 2>&1
     targetFrameworkExtRes=$(find build/portrom/images/system_ext -type f -name "framework-ext-res.apk")
-    bin/apktool/apktool d $targetFrameworkExtRes -o tmp/framework-ext-res -f > /dev/null 2>&1
+if [[ -f $targetFrameworkExtRes ]] && [[ ${port_android_version} != "15" ]]; then
     if grep -r config_celluar_shared_support tmp/framework-ext-res/ ; then  
         filename=$(basename $targetMiuiFrameworkResOverlay)
         yellow "开启通信共享功能" "Enable Celluar Sharing feature"
@@ -990,6 +1006,11 @@ if [[ -d "devices/common" ]];then
         unzip -oq devices/common/nfc_a14.zip -d build/portrom/images/
         echo "ro.vendor.nfc.dispatch_optim=1" >> build/portrom/images/vendor/build.prop
     fi
+    if [[ $base_device_code == "munch" ]] && [[ ${port_android_version} == "15" ]]; then
+        sourceCamera=$(find build/baserom/images/ -type f -name "MiuiCamera.apk")
+        targetCamera=$(find build/portrom/images/ -type d -name "MiuiCamera")
+        cp -rf $sourceCamera $targetCamera/
+    else
     
     if [[ $base_android_version == "13" ]] && [[ -f $commonCamera ]];then
         yellow "替换相机为10S HyperOS A13 相机，MI10可用, thanks to 酷安 @PedroZ" "Replacing a compatible MiuiCamera.apk verson 4.5.003000.2"
