@@ -80,10 +80,10 @@ else
     exit
 fi
 
-if [ "$(echo $baserom |grep miui_)" != "" ];then
-    device_code=$(basename $baserom |cut -d '_' -f 2)
-elif [ "$(echo $baserom |grep xiaomi.eu_)" != "" ];then
+if [ "$(echo $baserom |grep _multi_)" != "" ];then
     device_code=$(basename $baserom |cut -d '_' -f 3)
+elif [ "$(echo $baserom |grep miui_)" != "" ] || [ "$(echo $baserom |grep xiaomi.eu_)" != "" ];then
+    device_code=$(basename $baserom |cut -d '_' -f 2)
 else
     device_code="YourDevice"
 fi
