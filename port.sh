@@ -1183,6 +1183,136 @@ if [[ ${is_eu_rom} == true ]];then
     os_type="xiaomi.eu"
 fi
 
+for img in $(find build/baserom/images -type f -name "vbmeta*.img");do
+    python3 bin/patch-vbmeta.py ${img} > /dev/null 2>&1
+done
+
+if [[ $pack_method == "aosp" ]];then
+    rm -rf out/target/product/${base_rom_code}/
+    mkdir -p out/target/product/${base_rom_code}/IMAGES
+    mkdir -p out/target/product/${base_rom_code}/META
+    for part in SYSTEM SYSTEM_EXT PRODUCT VENDOR ODM MI_EXT; do
+        mkdir -p out/target/product/${base_rom_code}/$part
+    done
+    mv -fv build/portrom/images/*.img out/target/product/${base_rom_code}/IMAGES/
+    if [[ -d build/baserom/firmware-update ]];then
+        bootimg=$(find build/baserom/ -name "boot.img")
+        cp -rf $bootimg out/target/product/${base_rom_code}/IMAGES/
+    else
+        mv -fv build/baserom/images/*.img out/target/product/${base_rom_code}/IMAGES/
+    fi
+
+    if [[ -d devices/${base_rom_code} ]];then
+
+        ksu_bootimg_file=$(find devices/$base_rom_code/ -type f -name "*boot_ksu.img")
+        dtbo_file=$(find devices/$base_rom_code/ -type f -name "*dtbo_ksu.img")
+        if [ -f $ksu_bootimg_file ];then
+            mv -fv $ksu_bootimg_file out/target/product/${base_rom_code}/IMAGES/boot.img
+            mv -fv $dtbo_file out/target/product/${base_rom_code}/IMAGES/dtbo.img
+        fi
+    fi
+    rm -rf out/target/product/${base_rom_code}/META/ab_partitions.txt
+    rm -rf out/target/product/${base_rom_code}/target-file.zip
+    for part in out/target/product/${base_rom_code}/IMAGES/*.img; do
+        partname=$(basename "$part" .img)
+        echo $partname >> out/target/product/${base_rom_code}/META/ab_partitions.txt
+        if echo $super_list | grep -q -w "$partname"; then
+            super_list_info+="$partname "
+            bin/Linux/x86_64/map_file_generator $part ${part%.*}.map
+        fi
+    done 
+    rm -rf out/target/product/${base_rom_code}/META/dynamic_partitions_info.txt
+    let groupSize=superSize-1048576
+    {
+        echo "super_partition_size=$superSize"
+        echo "super_partition_groups=qti_dynamic_partitions"
+        echo "super_qti_dynamic_partitions_group_size=$groupSize"
+        echo "super_qti_dynamic_partitions_partition_list=$super_list_info"
+        echo "virtual_ab=true"
+        echo "virtual_ab_compression=true"
+    } >> out/target/product/${base_rom_code}/META/dynamic_partitions_info.txt
+
+    {
+        echo "default_system_dev_certificate=key/testkey"
+        echo "recovery_api_version=3"
+        echo "fstab_version=2"
+        echo "ab_update=true"
+     } >> out/target/product/${base_rom_code}/META/misc_info.txt
+    
+    if [[ "$is_ab_device" == false ]];then
+        sed -i "/ab_update=true/d" out/target/product/${base_rom_code}/META/misc_info.txt
+        {
+            echo "blockimgdiff_versions=3,4"
+            echo "use_dynamic_partitions=true"
+            echo "dynamic_partition_list=$super_list_info"
+            echo "super_partition_groups=qti_dynamic_partitions"
+            echo "super_qti_dynamic_partitions_group_size=$superSize"
+            echo "super_qti_dynamic_partitions_partition_list=$super_list_info"
+
+        } >> out/target/product/${base_rom_code}/META/misc_info.txt
+        mkdir -p out/target/product/${base_rom_code}/OTA/bin
+        if [[ -f devices/${base_device_code}/OTA/updater ]];then
+            cp -rf devices/${base_device_code}/OTA/updater out/target/product/${base_rom_code}/OTA/bin
+        else
+            cp -rf devices/common/non-ab/OTA/updater out/target/product/${base_rom_code}/OTA/bin
+        fi
+        if [[ -d build/baserom/firmware-update ]];then
+            cp -rf build/baserom/firmware-update out/target/product/${base_rom_code}/
+        elif find build/baserom/ -type f \( -name "*.elf" -o -name "*.mdn" -o -name "*.bin" \) | grep -q .; then
+            for firmware in $(find build/baserom/ -type f \( -name "*.elf" -o -name "*.mdn" -o -name "*.bin" \));do
+                mv  -rfv $firmware out/target/product/${base_rom_code}/firmware-update
+            done
+            bootimg=$(find build/baserom/ -name "boot.img")
+            dtboimg=$(find build/baserom/images -name "dtbo.img")
+            vbmetaimg=$(find build/baserom/images -name "vbmeta.img")
+            vmbeta_systemimg=$(find build/baserom/images -name "vbmeta_sytem.img")
+            cp -rf $bootimg out/target/product/${base_rom_code}/IMAGES/
+            cp -rf $dtboimg out/target/product/${base_rom_code}/firmware-update
+            cp -rf $vbmetaimg out/target/product/${base_rom_code}/firmware-update
+            cp -rf $vmbeta_systemimg out/target/product/${base_rom_code}/firmware-update
+        fi
+        export OUT=$(pwd)/out/target/product/${base_rom_code}/
+        if [[ -f devices/${base_device_code}/releasetools.py ]];then
+            cp -rf devices/${base_device_code}/releasetools.py out/target/product/${base_rom_code}/META/
+        else
+            cp -rf devices/common/releasetools.py out/target/product/${base_rom_code}/META/
+        fi
+
+        mkdir -p out/target/product/${base_rom_code}/RECOVERY/RAMDISK/etc/
+        if [[ -f devices/${base_device_code}/recovery.fstab ]];then
+            cp -rf devices/${base_device_code}/recovery.fstab out/target/product/${base_rom_code}/RECOVERY/RAMDISK/etc/
+        else
+            cp -rf devices/common/recovery.fstab out/target/product/${base_rom_code}/RECOVERY/RAMDISK/etc/
+        fi
+    fi
+    declare -A prop_paths=(
+    ["system"]="SYSTEM"
+    ["product"]="PRODUCT"
+    ["system_ext"]="SYSTEM_EXT"
+    ["vendor"]="VENDOR"
+    ["odm"]="ODM"
+    )
+
+    for dir in "${!prop_paths[@]}"; do
+        prop_file=$(find "build/portrom/images/$dir" -type f -name "build.prop" -print -quit)
+        if [ -n "$prop_file" ]; then
+            cp "$prop_file" "out/target/product/${base_rom_code}/${prop_paths[$dir]}/"
+        fi
+    done
+    pushd out/target/product/${base_rom_code}/
+    zip -r target-file.zip IMAGES META SYSTEM VENDOR ODM PRODUCT SYSTEM_EXT OTA MI_EXT RECOVERY
+    popd
+    ./bin/ota_from_target_files.py out/target/product/${base_rom_code}/target-file.zip out/${base_rom_code}-ota_full_${port_rom_version}-user-${port_android_version}.0.zip
+    ziphash=$(md5sum out/${base_rom_code}-ota_full_${port_rom_version}-user-${port_android_version}.0.zip |head -c 10)
+    if [[ ${is_eu_rom} == true ]];then
+       rom_code="xiaomi.eu"_$base_rom_code
+    else
+       rom_code=$base_rom_code
+    fi  
+    mv -f out/${base_rom_code}-ota_full_${port_rom_version}-user-${port_android_version}.0.zip out/${rom_code}-ota_full-${port_rom_version}-user-${port_android_version}.0-${ziphash}.zip
+    green "$(pwd)/out/${rom_code}-ota_full_${port_rom_version}-user-${port_android_version}.0-${ziphash}.zip"
+
+else
 # 打包 super.img
 if [[ "$is_ab_device" == false ]];then
     blue "打包A-only super.img" "Packing super.img for A-only device"
@@ -1407,3 +1537,4 @@ mv out/${os_type}_${device_code}_${port_rom_version}.zip out/${os_type}_${device
 green "移植完毕" "Porting completed"    
 green "输出包路径：" "Output: "
 green "$(pwd)/out/${os_type}_${device_code}_${port_rom_version}_${hash}_${port_android_version}_${port_rom_code}_${pack_timestamp}_${pack_type}.zip"
+fi
