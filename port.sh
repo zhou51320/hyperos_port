@@ -432,8 +432,8 @@ fi
 #fi
 
 # 人脸
-baseMiuiBiometric=$(find build/baserom/images/product/app -type d -name "MiuiBiometric*")
-portMiuiBiometric=$(find build/portrom/images/product/app -type d -name "MiuiBiometric*")
+baseMiuiBiometric=$(find build/baserom/images/product/app -type d -name "*Biometric*")
+portMiuiBiometric=$(find build/portrom/images/product/app -type d -name "*Biometric*")
 if [ -d "${baseMiuiBiometric}" ] && [ -d "${portMiuiBiometric}" ];then
     yellow "查找MiuiBiometric" "Searching and Replacing MiuiBiometric.."
     rm -rf ./${portMiuiBiometric}/*
