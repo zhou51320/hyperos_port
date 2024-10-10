@@ -1178,6 +1178,11 @@ for pname in ${super_list};do
 done
 rm fstype.txt
 
+os_type="hyperos"
+if [[ ${is_eu_rom} == true ]];then
+    os_type="xiaomi.eu"
+fi
+
 # 打包 super.img
 if [[ "$is_ab_device" == false ]];then
     blue "打包A-only super.img" "Packing super.img for A-only device"
@@ -1223,10 +1228,7 @@ fi
 #    rm -rf build/portrom/images/${pname}.img
 #done
 
-os_type="hyperos"
-if [[ ${is_eu_rom} == true ]];then
-    os_type="xiaomi.eu"
-fi
+
 
 blue "正在压缩 super.img" "Comprising super.img"
 zstd --rm build/portrom/images/super.img -o build/portrom/images/super.zst
@@ -1349,7 +1351,10 @@ else
         sed -i "s/dtbo.img/dtbo_noksu.img/g" out/${os_type}_${device_code}_${port_rom_version}/windows_flash_script.bat
         sed -i "s/dtbo.img/dtbo_noksu.img/g" out/${os_type}_${device_code}_${port_rom_version}/mac_linux_flash_script.sh
     else
-    bootimg=$(find out/${os_type}_${device_code}_${port_rom_version} -name "boot.img")
+            bootimg=$(find out/${os_type}_${device_code}_${port_rom_version} build/baserom/ -name "boot.img" | head -n 1)
+            if [ ! -f $bootimg ];then
+                bootimg=$(find build/baserom/ -name "boot.img")
+            fi
     mv -f $bootimg out/${os_type}_${device_code}_${port_rom_version}/boot_official.img
     fi
 
