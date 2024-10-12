@@ -43,11 +43,10 @@ check unzip aria2c 7z zip java zipalign python3 zstd bc xmlstarlet
 port_partition=$(grep "partition_to_port" bin/port_config |cut -d '=' -f 2)
 #super_list=$(grep "super_list" bin/port_config |cut -d '=' -f 2)
 repackext4=$(grep "repack_with_ext4" bin/port_config |cut -d '=' -f 2)
-
+pack_method=$(grep "pack_method" bin/port_config | cut -d '=' -f 2)
+nfc_fix_type=$(grep "nfc_fix_type" bin/port_config |cut -d '=' -f 2)
 if [[ ${repackext4} == true ]]; then
     pack_type=EXT
-else
-    pack_type=EROFS
 fi
 
 
@@ -279,7 +278,7 @@ rm -rf config
 blue "正在获取ROM参数" "Fetching ROM build prop."
 
 # 安卓版本
-base_android_version=$(< build/portrom/images/vendor/build.prop grep "ro.vendor.build.version.release" |awk 'NR==1' |cut -d '=' -f 2)
+base_android_version=$(< build/baserom/images/system/system/build.prop grep "ro.system.build.version.release" |awk 'NR==1' |cut -d '=' -f 2)
 port_android_version=$(< build/portrom/images/system/system/build.prop grep "ro.system.build.version.release" |awk 'NR==1' |cut -d '=' -f 2)
 green "安卓版本: 底包为[Android ${base_android_version}], 移植包为 [Android ${port_android_version}]" "Android Version: BASEROM:[Android ${base_android_version}], PORTROM [Android ${port_android_version}]"
 
@@ -558,9 +557,12 @@ else
     blue "File $targetVintf not found."
 fi
 
-
-
-if [[ ${port_rom_code} != "sheng" ]] || [[ ${port_rom_code} != "shennong" ]];then
+if [[ ${port_rom_code} == "sheng" ]] || [[ ${port_android_version} == "15" ]];then
+    blue "Skip StrongToast UI fix"
+elif [[ ${port_rom_code} == "houji" ]] || [[ ${port_rom_code} == "shennong" ]] ;then
+    blue "左侧挖孔灵动岛修复" "StrongToast UI fix"
+    patch_smali "MiuiSystemUI.apk" "MIUIStrongToast\$2.smali" "const\/4 v7\, 0x0" "iget-object v7\, v1\, Lcom\/android\/systemui\/toast\/MIUIStrongToast;->mRLLeft:Landroid\/widget\/RelativeLayout;\\n\\tinvoke-virtual {v7}, Landroid\/widget\/RelativeLayout;->getLeft()I\\n\\tmove-result v7\\n\\tint-to-float v7,v7"
+else
 blue "左侧挖孔灵动岛修复" "StrongToast UI fix"
     patch_smali "MiuiSystemUI.apk" "MIUIStrongToast\$2.smali" "const\/4 v9\, 0x0" "iget-object v9\, v1\, Lcom\/android\/systemui\/toast\/MIUIStrongToast;->mRLLeft:Landroid\/widget\/RelativeLayout;\\n\\tinvoke-virtual {v9}, Landroid\/widget\/RelativeLayout;->getLeft()I\\n\\tmove-result v9\\n\\tint-to-float v9,v9"
 fi
@@ -572,9 +574,9 @@ fi
 
 if [[ ${is_eu_rom} == "true" ]];then
     patch_smali "miui-services.jar" "SystemServerImpl.smali" ".method public constructor <init>()V/,/.end method" ".method public constructor <init>()V\n\t.registers 1\n\tinvoke-direct {p0}, Lcom\/android\/server\/SystemServerStub;-><init>()V\n\n\treturn-void\n.end method" "regex"
-
-elif [[ ${port_rom_code} != "sheng" ]] || [[ ${port_rom_code} != "shennong" ]];then
-    
+elif [[ ${port_android_version} == "15" ]];then
+   blue "Skip Signature Verfier fix"
+else 
     if [[ ! -d tmp ]];then
         mkdir -p tmp/
     fi
@@ -659,7 +661,7 @@ else
     rm -rf build/portrom/images/product/etc/auto-install*
     rm -rf build/portrom/images/product/data-app/*GalleryLockscreen* >/dev/null 2>&1
     mkdir -p tmp/app
-    kept_data_apps=("DownloadProviderUi" "VirtualSim" "ThirdAppAssistant" "GameCenter" "Video" "Weather" "DeskClock" "Gallery" "SoundRecorder" "ScreenRecorder" "Calculator" "CleanMaster" "Calendar" "Compass" "Notes" "MediaEditor" "Scanner" "SpeechEngine" "wps-lite")
+    kept_data_apps=("MIUISecurityManager" "MIUIThemeStore" "DownloadProviderUi" "VirtualSim" "ThirdAppAssistant" "GameCenter" "Video" "Weather" "DeskClock" "Gallery" "SoundRecorder" "ScreenRecorder" "Calculator" "CleanMaster" "Calendar" "Compass" "Notes" "MediaEditor" "Scanner" "SpeechEngine" "wps-lite")
     for app in "${kept_data_apps[@]}"; do
         mv build/portrom/images/product/data-app/*"${app}"* tmp/app/ >/dev/null 2>&1
         done
@@ -979,8 +981,15 @@ if [[ -d "devices/common" ]];then
     targetMiLinkCirculateMIUI15=$(find build/portrom/images/product -type d -name "MiLinkCirculate*")
     targetNQNfcNci=$(find build/portrom/images/system/system build/portrom/images/product build/portrom/images/system_ext -type d -name "NQNfcNci*")
 
-    if [[ $base_android_version == "13" ]] && [[ $port_android_version == "14" ]];then
+    
+    if [[ $nfc_fix_type == "legacy" ]];then
+        if [[ -d $targetNQNfcNci ]];then
         rm -rf $targetNQNfcNci
+        fi
+        find build/portrom/images/ -name "com.nxp.nfc.nq.jar" -type f -delete
+        find build/portrom/images/ -name "com.xiaomi.nfc.jar" -type f -delete
+        unzip -oq devices/common/nfc_legacy.zip -d build/portrom/images/
+    elif [[ $nfc_fix_type == "a14" ]]; then
         unzip -oq devices/common/nfc_a14.zip -d build/portrom/images/
         echo "ro.vendor.nfc.dispatch_optim=1" >> build/portrom/images/vendor/build.prop
     fi
@@ -1001,7 +1010,7 @@ if [[ -d "devices/common" ]];then
         yellow "替换开机第二屏动画" "Repacling bootanimation.zip"
         cp -rf $bootAnimationZIP $targetAnimationZIP
     fi
-
+    fi
     if [[ -d "$targetMiLinkCirculateMIUI15" ]]; then
         rm -rf $targetMiLinkCirculateMIUI15/*
         cp -rf $MiLinkCirculateMIUI15 $targetMiLinkCirculateMIUI15
