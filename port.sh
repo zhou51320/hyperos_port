@@ -1228,7 +1228,7 @@ if [[ $pack_method == "aosp" ]];then
     } >> out/target/product/${base_rom_code}/META/dynamic_partitions_info.txt
 
     {
-        echo "default_system_dev_certificate=key/testkey"
+        #echo "default_system_dev_certificate=key/testkey"
         echo "recovery_api_version=3"
         echo "fstab_version=2"
         echo "ab_update=true"
@@ -1243,8 +1243,13 @@ if [[ $pack_method == "aosp" ]];then
             echo "super_partition_groups=qti_dynamic_partitions"
             echo "super_qti_dynamic_partitions_group_size=$superSize"
             echo "super_qti_dynamic_partitions_partition_list=$super_list_info"
+            echo "board_uses_vendorimage=true"
 
         } >> out/target/product/${base_rom_code}/META/misc_info.txt
+        recovery_file=$(find build/portrom/ -name "recovery-from-boot.p")
+        if [[ -f $recovery_file ]];then
+            cp -rfv $recovery_file out/target/product/${base_rom_code}/VENDOR/
+        fi
         mkdir -p out/target/product/${base_rom_code}/OTA/bin
         if [[ -f devices/${base_device_code}/OTA/updater ]];then
             cp -rf devices/${base_device_code}/OTA/updater out/target/product/${base_rom_code}/OTA/bin
