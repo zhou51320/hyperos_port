@@ -229,6 +229,14 @@ elif [[ ${baserom_type} == 'br' ]];then
         done
 fi
 
+source_img_type=$($tools_dir/gettype -i build/baserom/images/system.img)
+
+if [[ $source_img_type == "erofs" ]] && [[ $repackext4 != true ]];then
+    pack_type="EROFS"
+else
+    pack_type="EXT"
+fi
+
 for part in system system_dlkm system_ext product product_dlkm mi_ext ;do
     extract_partition build/baserom/images/${part}.img build/baserom/images    
 done
