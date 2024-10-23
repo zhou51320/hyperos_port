@@ -1297,7 +1297,10 @@ if [[ $pack_method == "aosp" ]];then
     pushd out/target/product/${base_rom_code}/
     zip -r target-file.zip IMAGES META SYSTEM VENDOR ODM PRODUCT SYSTEM_EXT OTA MI_EXT RECOVERY
     popd
-    ./bin/ota_from_target_files.py out/target/product/${base_rom_code}/target-file.zip out/${base_rom_code}-ota_full_${port_rom_version}-user-${port_android_version}.0.zip
+    pushd otatools
+    export PATH=${work_dir}/otatools/bin/:$PATH
+    ./bin/ota_from_target_files ${work_dir}/out/target/product/${base_rom_code}/target-file.zip ${work_dir}/out/${base_rom_code}-ota_full_${port_rom_version}-user-${port_android_version}.0.zip
+    popd
     ziphash=$(md5sum out/${base_rom_code}-ota_full_${port_rom_version}-user-${port_android_version}.0.zip |head -c 10)
     if [[ ${is_eu_rom} == true ]];then
        rom_code="xiaomi.eu"_$base_rom_code
