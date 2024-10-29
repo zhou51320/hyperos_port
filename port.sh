@@ -1244,6 +1244,7 @@ if [[ $pack_method == "aosp" ]];then
             echo "super_qti_dynamic_partitions_group_size=$superSize"
             echo "super_qti_dynamic_partitions_partition_list=$super_list_info"
             echo "board_uses_vendorimage=true"
+            echo "cache_size=402653184"
 
         } >> out/target/product/${base_rom_code}/META/misc_info.txt
         recovery_file=$(find build/portrom/ -name "recovery-from-boot.p")
