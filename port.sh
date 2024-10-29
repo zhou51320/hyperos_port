@@ -1178,7 +1178,7 @@ if [[ ${is_eu_rom} == true ]];then
     os_type="xiaomi.eu"
 fi
 
-for img in $(find build/baserom/images -type f -name "vbmeta*.img");do
+for img in $(find build/baserom/ -type f -name "vbmeta*.img");do
     python3 bin/patch-vbmeta.py ${img} > /dev/null 2>&1
 done
 
