@@ -51,7 +51,6 @@ jobs:
         run: |
           cd "$GITHUB_WORKSPACE"
           mkdir tmp
-          rclone sync -P onedrive:/ROM_FILES/ tmp/
           zipfiles=$(find tmp -name "*.zip")
           for file in $zipfiles; do
             echo "Unzipping $file to devices folder" 
@@ -79,15 +78,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"/GithubRelease
           sudo split -b 1536M -d "$GITHUB_WORKSPACE"/out/$ROM_FILE $ROM_FILE
           ls -al "$GITHUB_WORKSPACE"/GithubRelease/
-      - name: 7.上传到OneDrive | PUSH ROM TO ONEDRIVE
-        run: |
-            rclone sync -P "$GITHUB_WORKSPACE"/out/${{ env.ROM_FILE }} onedrive:/ROM/github-actions
-            rclone copy -P  "$GITHUB_WORKSPACE"/config.zip onedrive:/ROM/github-actions
-            SHARE_LINK=$(rclone link onedrive:/ROM/github-actions/ --onedrive-link-scope anonymous)
-            touch file.log
-            echo -e "Onedrive下载链接 | Onedrive alternate download link: \n $SHARE_LINK" > file.log
-     
-      - name: 8. 上传到Github Release| UPLOAD ROM TO GITHUB RELEASAE
+      - name: 7.上传到Github Release| UPLOAD ROM TO GITHUB RELEASAE
         uses: ncipollo/release-action@main
         with:
           artifacts: ${{ github.workspace }}/GithubRelease/*
