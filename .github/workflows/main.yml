@@ -1,4 +1,3 @@
-name: build_mi13_testing
 on:
   workflow_dispatch:
     inputs:
@@ -65,7 +64,6 @@ jobs:
           sudo timedatectl set-timezone Asia/Shanghai
           java -version
           python3 --version
-          ls -alR "$GITHUB_WORKSPACE"
           sudo bash "$GITHUB_WORKSPACE"/port.sh ${{ github.event.inputs.STOCK_URL }} ${{ github.event.inputs.PORT_URL }} 
           sudo zip -jr "$GITHUB_WORKSPACE"/config.zip "$GITHUB_WORKSPACE"/build/portrom/images/config
       - name: 5. 准备上传 | PREPARE UPLOADING
