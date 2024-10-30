@@ -304,14 +304,15 @@ port_mios_version_incremental=$(< build/portrom/images/mi_ext/etc/build.prop gre
 
 port_device_code=$(echo $port_mios_version_incremental | cut -d "." -f 5)
 
-if [[ $port_mios_version_incremental == *DEV* ]] || [[ ${portrom_type} == "fastboot" ]];then
-    yellow "检测到开发板，跳过修改版本代码" "Dev deteced,skip replacing codename"
-    port_rom_version="$(echo $port_mios_version_incremental)"
-elif [[ $port_android_version == "14" ]];then
+if [[ $port_android_version == "14" ]];then
     base_device_code=U$(echo $base_rom_version | cut -d "." -f 5 | cut -c 2-)
-    port_rom_version=$(echo $port_mios_version_incremental | sed "s/$port_device_code/$base_device_code/")
 elif [[ $port_android_version == "15" ]];then
     base_device_code=V$(echo $base_rom_version | cut -d "." -f 5 | cut -c 2-)
+fi
+if [[ $port_mios_version_incremental == *DEV* ]];then
+    yellow "检测到开发板，跳过修改版本代码" "Dev deteced,skip replacing codename"
+    port_rom_version="$(echo $port_mios_version_incremental)"
+else
     port_rom_version=$(echo $port_mios_version_incremental | sed "s/$port_device_code/$base_device_code/")
 fi
 green "ROM 版本: 底包为 [${base_rom_version}], 移植包为 [${port_rom_version}]" "ROM Version: BASEROM: [${base_rom_version}], PORTROM: [${port_rom_version}] "
@@ -980,11 +981,14 @@ if [[ ${port_rom_code} == "dagu_cn" ]] || [[ ${port_rom_code} == "sheng" ]];then
 
 fi
 
+sourceAnimationZIP=$(find build/baserom/images/product -type f -name "bootanimation.zip")
+targetAnimationZIP=$(find build/portrom/images/product -type f -name "bootanimation.zip")
+cp -rf $sourceAnimationZIP $targetAnimationZIP
+
 if [[ -d "devices/common" ]];then
     commonCamera=$(find devices/common -type f -name "MiuiCamera.apk")
     targetCamera=$(find build/portrom/images/product -type d -name "MiuiCamera")
-    bootAnimationZIP=$(find devices/common -type f -name "bootanimation_${base_rom_density}.zip")
-    targetAnimationZIP=$(find build/portrom/images/product -type f -name "bootanimation.zip")
+    
     MiLinkCirculateMIUI15=$(find devices/common -type d -name "MiLinkCirculate*" )
     targetMiLinkCirculateMIUI15=$(find build/portrom/images/product -type d -name "MiLinkCirculate*")
     targetNQNfcNci=$(find build/portrom/images/system/system build/portrom/images/product build/portrom/images/system_ext -type d -name "NQNfcNci*")
@@ -1207,6 +1211,7 @@ if [[ $pack_method == "aosp" ]];then
         fi
     fi
     rm -rf out/target/product/${base_rom_code}/META/ab_partitions.txt
+    rm -rf out/target/product/${base_rom_code}/META/update_engine_config.txt
     rm -rf out/target/product/${base_rom_code}/target-file.zip
     for part in out/target/product/${base_rom_code}/IMAGES/*.img; do
         partname=$(basename "$part" .img)
@@ -1233,6 +1238,11 @@ if [[ $pack_method == "aosp" ]];then
         echo "fstab_version=2"
         echo "ab_update=true"
      } >> out/target/product/${base_rom_code}/META/misc_info.txt
+    
+    {
+        echo "PAYLOAD_MAJOR_VERSION=2"
+        echo "PAYLOAD_MINOR_VERSION=8"
+    } >> out/target/product/${base_rom_code}/META/update_engine_config.txt
     
     if [[ "$is_ab_device" == false ]];then
         sed -i "/ab_update=true/d" out/target/product/${base_rom_code}/META/misc_info.txt
