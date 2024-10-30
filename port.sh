@@ -304,14 +304,15 @@ port_mios_version_incremental=$(< build/portrom/images/mi_ext/etc/build.prop gre
 
 port_device_code=$(echo $port_mios_version_incremental | cut -d "." -f 5)
 
-if [[ $port_mios_version_incremental == *DEV* ]] || [[ ${portrom_type} == "fastboot" ]];then
-    yellow "检测到开发板，跳过修改版本代码" "Dev deteced,skip replacing codename"
-    port_rom_version="$(echo $port_mios_version_incremental)"
-elif [[ $port_android_version == "14" ]];then
+if [[ $port_android_version == "14" ]];then
     base_device_code=U$(echo $base_rom_version | cut -d "." -f 5 | cut -c 2-)
-    port_rom_version=$(echo $port_mios_version_incremental | sed "s/$port_device_code/$base_device_code/")
 elif [[ $port_android_version == "15" ]];then
     base_device_code=V$(echo $base_rom_version | cut -d "." -f 5 | cut -c 2-)
+fi
+if [[ $port_mios_version_incremental == *DEV* ]];then
+    yellow "检测到开发板，跳过修改版本代码" "Dev deteced,skip replacing codename"
+    port_rom_version="$(echo $port_mios_version_incremental)"
+else
     port_rom_version=$(echo $port_mios_version_incremental | sed "s/$port_device_code/$base_device_code/")
 fi
 green "ROM 版本: 底包为 [${base_rom_version}], 移植包为 [${port_rom_version}]" "ROM Version: BASEROM: [${base_rom_version}], PORTROM: [${port_rom_version}] "
