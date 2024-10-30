@@ -981,11 +981,14 @@ if [[ ${port_rom_code} == "dagu_cn" ]] || [[ ${port_rom_code} == "sheng" ]];then
 
 fi
 
+sourceAnimationZIP=$(find build/baserom/images/product -type f -name "bootanimation.zip")
+targetAnimationZIP=$(find build/portrom/images/product -type f -name "bootanimation.zip")
+cp -rf $sourceAnimationZIP $targetAnimationZIP
+
 if [[ -d "devices/common" ]];then
     commonCamera=$(find devices/common -type f -name "MiuiCamera.apk")
     targetCamera=$(find build/portrom/images/product -type d -name "MiuiCamera")
-    bootAnimationZIP=$(find devices/common -type f -name "bootanimation_${base_rom_density}.zip")
-    targetAnimationZIP=$(find build/portrom/images/product -type f -name "bootanimation.zip")
+    
     MiLinkCirculateMIUI15=$(find devices/common -type d -name "MiLinkCirculate*" )
     targetMiLinkCirculateMIUI15=$(find build/portrom/images/product -type d -name "MiLinkCirculate*")
     targetNQNfcNci=$(find build/portrom/images/system/system build/portrom/images/product build/portrom/images/system_ext -type d -name "NQNfcNci*")
