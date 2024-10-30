@@ -1208,6 +1208,7 @@ if [[ $pack_method == "aosp" ]];then
         fi
     fi
     rm -rf out/target/product/${base_rom_code}/META/ab_partitions.txt
+    rm -rf out/target/product/${base_rom_code}/META/update_engine_config.txt
     rm -rf out/target/product/${base_rom_code}/target-file.zip
     for part in out/target/product/${base_rom_code}/IMAGES/*.img; do
         partname=$(basename "$part" .img)
@@ -1234,6 +1235,11 @@ if [[ $pack_method == "aosp" ]];then
         echo "fstab_version=2"
         echo "ab_update=true"
      } >> out/target/product/${base_rom_code}/META/misc_info.txt
+    
+    {
+        echo "PAYLOAD_MAJOR_VERSION=2"
+        echo "PAYLOAD_MINOR_VERSION=8"
+    } >> out/target/product/${base_rom_code}/META/update_engine_config.txt
     
     if [[ "$is_ab_device" == false ]];then
         sed -i "/ab_update=true/d" out/target/product/${base_rom_code}/META/misc_info.txt
