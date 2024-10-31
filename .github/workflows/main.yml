@@ -23,6 +23,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    vm-size: "200GB"
     steps:
       - name: 1. 最大化并挂载构建空间 | MAXIMIZE BUILD SPACE
         uses: easimon/maximize-build-space@master
