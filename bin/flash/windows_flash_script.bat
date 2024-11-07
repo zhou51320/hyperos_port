@@ -55,7 +55,7 @@ if "%LANG%"=="Chinese" (
 )
 
 for /f "tokens=2 delims=: " %%i in ('fastboot %* getvar product 2^>^&1 ^| findstr /r /c:"^product: "') do set "product=%%i"
-set "expected_device=umi"
+set "expected_device=device_code"
 if "%LANG%"=="Chinese" (
     set "msg_mismatch= 设备device_code不匹配。请检查是否是进入fastbootd模式"
     set "msg_continue=你想继续吗？(y/n):  "
