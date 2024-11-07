@@ -154,7 +154,7 @@ mkdir -p build/portrom/images/
 # 提取分区
 if [[ ${baserom_type} == 'payload' ]];then
     blue "正在提取底包 [payload.bin]" "Extracting files from BASEROM [payload.bin]"
-    unzip ${baserom} payload.bin -d build/baserom > /dev/null 2>&1 ||error "解压底包 [payload.bin] 时出错" "Extracting [payload.bin] error"
+    payload-dumper --out build/baserom/images/ $baserom
     green "底包 [payload.bin] 提取完毕" "[payload.bin] extracted."
 elif [[ ${baserom_type} == 'br' ]];then
     blue "正在提取底包 [new.dat.br]" "Extracting files from BASEROM [*.new.dat.br]"
@@ -196,16 +196,11 @@ elif [[ ${portrom_type} == "fastboot" ]];then
     green "移植包 [super.img] 提取完毕" "[super.img] extracted."
 else
     blue "正在提取移植包 [payload.bin]" "Extracting files from PORTROM [payload.bin]"
-    unzip ${portrom} payload.bin -d build/portrom  > /dev/null 2>&1 ||error "解压移植包 [payload.bin] 时出错"  "Extracting [payload.bin] error"
+    payload-dumper --partitions system,product,system_ext,mi_ext --out build/portrom/images/ $portrom
     green "移植包 [payload.bin] 提取完毕" "[payload.bin] extracted."
 fi
 
-if [[ ${baserom_type} == 'payload' ]];then
-
-    blue "开始分解底包 [payload.bin]" "Unpacking BASEROM [payload.bin]"
-    payload-dumper-go -o build/baserom/images/ build/baserom/payload.bin >/dev/null 2>&1 ||error "分解底包 [payload.bin] 时出错" "Unpacking [payload.bin] failed"
-
-elif [[ ${is_base_rom_eu} == true ]];then
+if [[ ${is_base_rom_eu} == true ]];then
     blue "开始分解底包 [super.img]" "Unpacking BASEROM [super.img]"
     super_list=$(python3 bin/lpunpack.py --info build/baserom/super.img | grep "super:" | awk '{ print $5 }')
     for i in ${super_list}; do
@@ -271,10 +266,6 @@ for part in ${super_list};do
             blue "lpunpack.py PORTROM super.img ${part}_a"
             python3 bin/lpunpack.py -p ${part}_a build/portrom/super.img build/portrom/images 
             mv build/portrom/images/${part}_a.img build/portrom/images/${part}.img
-        else
-            blue "payload.bin 提取 [${part}] 分区..." "Extracting [${part}] from PORTROM payload.bin"
-
-            payload-dumper-go -p ${part} -o build/portrom/images/ build/portrom/payload.bin >/dev/null 2>&1 || error "提取移植包 [${part}] 分区时出错" "Extracting partition [${part}] error."
         fi
     extract_partition "${work_dir}/build/portrom/images/${part}.img" "${work_dir}/build/portrom/images/"
     else
