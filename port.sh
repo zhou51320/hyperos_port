@@ -1023,8 +1023,11 @@ if [[ -d "devices/common" ]];then
     elif [[ $nfc_fix_type == "a14" ]]; then
         unzip -oq devices/common/nfc_a14.zip -d build/portrom/images/
         echo "ro.vendor.nfc.dispatch_optim=1" >> build/portrom/images/vendor/build.prop
+    elif [[ ${port_android_version} == "15" ]]; then
+        unzip -oq devices/common/nfc_a15.zip -d build/portrom/images/
+        echo "ro.vendor.nfc.dispatch_optim=1" >> build/portrom/images/vendor/build.prop
     fi
-    if [[ $base_device_code == "munch" ]] && [[ ${port_android_version} == "15" ]]; then
+    if [[ $base_rom_code == "munch" ]] && [[ ${port_android_version} == "15" ]]; then
         sourceCamera=$(find build/baserom/images/ -type f -name "MiuiCamera.apk")
         targetCamera=$(find build/portrom/images/ -type d -name "MiuiCamera")
         cp -rf $sourceCamera $targetCamera/
