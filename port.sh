@@ -827,6 +827,10 @@ unlock_device_feature "device support screen enhance engine"  "bool" "support_sc
 unlock_device_feature "Whether suppot Android Flashlight Controller"  "bool" "support_android_flashlight"
 unlock_device_feature "Whether support SR for image display"  "bool" "support_SR_for_image_display"
 
+unlock_device_feature "whether the device aod need grayscale" "bool" "is_aod_need_grayscale"
+
+unlock_device_feature "whether the device supports aod fullscreen mode" "bool" "support_aod_fullscreen"
+unlock_device_feature "whether the device supports aod aon mode" "bool" "support_aod_aon"
 # Unlock MEMC; unlocking the screen enhance engine is a prerequisite.
 # This feature add additional frames to videos to make content appear smooth and transitions lively.
 if  grep -q "ro.vendor.media.video.frc.support" build/portrom/images/vendor/build.prop ;then
