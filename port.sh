@@ -486,6 +486,7 @@ if [[ -f $targetAospFrameworkResOverlay ]]; then
     if [[ $port_android_version == "15" ]]; then
         blue "Fix VanillaIceCream brightness" 
         for xml in $(find tmp/$targetDir -type f -name "*.xml");do
+            sed -i "s/config_screenBrightnessDim\"/config_screenBrightnessDim_hyper\"/g" $xml
             sed -i "s/config_screenBrightnessSettingDefault\"/config_screenBrightnessSettingDefault_hyper\"/g" $xml
             sed -i "s/config_screenBrightnessSettingMaximum\"/config_screenBrightnessSettingMaximum_hyper\"/g" $xml
             sed -i "s/config_screenBrightnessSettingMinimum\"/config_screenBrightnessSettingMinimum_hyper\"/g" $xml 
