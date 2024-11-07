@@ -497,6 +497,28 @@ if [[ -f $targetAospFrameworkResOverlay ]]; then
     cp -rf tmp/$filename $targetAospFrameworkResOverlay
 fi
 
+sourceMiuiFrameworkTelephonyResOverlay=$(find build/baserom/images/product -type f -name "MiuiFrameworkTelephonyResOverlay.apk")
+targetMiuiFrameworkTelephonyResOverlay=$(find build/portrom/images/product -type f -name "MiuiFrameworkTelephonyResOverlay.apk")
+if [[ ! -f $sourceMiuiFrameworkTelephonyResOverlay ]]; then
+    
+    if [[ ! -d tmp ]]; then
+     mkdir tmp
+    fi
+    filename=$(basename $targetMiuiFrameworkTelephonyResOverlay)
+    targetDir=$(echo "$filename" | sed 's/\..*$//')
+   bin/apktool/apktool d $targetMiuiFrameworkTelephonyResOverlay -o tmp/$targetDir -f > /dev/null 2>&1
+    if [[ $port_android_version == "15" ]]; then
+        for xml in $(find tmp/$targetDir -type f -name "*.xml");do
+            sed -i 's|<bool name="config_roaming_optimization_supported">true</bool>|<bool name="config_roaming_optimization_supported">false</bool>|g' "$xml"
+        done 
+    fi
+    bin/apktool/apktool b tmp/$targetDir -o tmp/$filename > /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
+    cp -rf tmp/$filename $targetMiuiFrameworkTelephonyResOverlay
+else
+    cp -rf $sourceMiuiFrameworkTelephonyResOverlay $targetMiuiFrameworkTelephonyResOverlay
+fi
+
+
 #其他机型可能没有default.prop
 for prop_file in $(find build/portrom/images/vendor/ -name "*.prop"); do
     vndk_version=$(< "$prop_file" grep "ro.vndk.version" | awk "NR==1" | cut -d '=' -f 2)
