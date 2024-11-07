@@ -20,7 +20,7 @@ portrom="$2"
 
 work_dir=$(pwd)
 tools_dir=${work_dir}/bin/$(uname)/$(uname -m)
-export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$PATH
+export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$(pwd)/otatools/bin:$PATH
 
 # Import functions
 source functions.sh
