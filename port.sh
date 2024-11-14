@@ -900,6 +900,16 @@ if [[ -f $targetFrameworkExtRes ]] && [[ ${port_android_version} != "15" ]]; the
     java -jar bin/apktool/APKEditor.jar b -i tmp/framework-ext-res -o tmp/$filename -f> /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
         cp -rf tmp/$filename $targetFrameworkExtRes
 fi
+targetMIUIThemeManagerAPK=$(find build/portrom -type f -name "MIUIThemeManager.apk")
+if [[ -f $targetMIUIThemeManagerAPK ]];then
+    cp -rf $targetMIUIThemeManagerAPK tmp/$(basename $targetMIUIThemeManagerAPK).bak
+    java -jar bin/apktool/APKEditor.jar d -i $targetMIUIThemeManagerAPK -o tmp/MIUIThemeManager -f > /dev/null 2>&1
+    targetsmali=$(find tmp/ -name "o1t.smali" -path "*/basemodule/utils/*")
+    python3 bin/patchmethod.py $targetsmali mcp -return true
+    java -jar bin/apktool/APKEditor.jar b -i tmp/MIUIThemeManager -o $targetMIUIThemeManagerAPK -f > /dev/null 2>&1
+
+fi
+
 targetSettingsAPK=$(find build/portrom -type f -name "Settings.apk")
 if [[ -f $targetSettingsAPK ]];then
     cp -rf $targetSettingsAPK tmp/$(basename $targetSettingsAPK).bak
