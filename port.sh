@@ -900,6 +900,14 @@ if [[ -f $targetFrameworkExtRes ]] && [[ ${port_android_version} != "15" ]]; the
     java -jar bin/apktool/APKEditor.jar b -i tmp/framework-ext-res -o tmp/$filename -f> /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
         cp -rf tmp/$filename $targetFrameworkExtRes
 fi
+targetSettingsAPK=$(find build/portrom -type f -name "Settings.apk")
+if [[ -f $targetSettingsAPK ]];then
+    cp -rf $targetSettingsAPK tmp/$(basename $targetSettingsAPK).bak
+    java -jar bin/apktool/APKEditor.jar d -i $targetSettingsAPK -o tmp/Settings -f > /dev/null 2>&1
+    targetsmali=$(find tmp/ -type f -path "*/com/android/settings/InternalDeviceUtils.smali")
+    python3 bin/patchmethod.py $targetsmali isAiSupported -return true
+    java -jar bin/apktool/APKEditor.jar b -i tmp/Settings -o $targetSettingsAPK -f > /dev/null 2>&1
+fi
 
 if [[ ${port_rom_code} == "munch_cn" ]];then
     # Add missing camera permission android.permission.TURN_SCREEN_ON
