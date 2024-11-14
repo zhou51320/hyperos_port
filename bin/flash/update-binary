@@ -78,6 +78,12 @@ if [ "$isDamaged" != "" ];then
 	exit 1
 fi
 
+if [ "$ZIPNAME" = "package.zip" ]; then
+    AdbSideLoad="true"
+else
+    AdbSideLoad=""
+fi
+
 if [ "$AdbSideLoad" = "" ]; then
 	ui_print "- 正在校验MD5 - Verifying MD5 checksum."
 	ui_print " "
