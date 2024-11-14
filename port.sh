@@ -1174,43 +1174,89 @@ done
 echo "${pack_type}">fstype.txt
 superSize=$(bash bin/getSuperSize.sh $device_code)
 green "Super大小为${superSize}" "Super image size: ${superSize}"
-green "开始打包镜像" "Packing super.img"
-for pname in ${super_list};do
-    if [ -d "build/portrom/images/$pname" ];then
-        if [[ "$OSTYPE" == "darwin"* ]];then
-            thisSize=$(find build/portrom/images/${pname} | xargs stat -f%z | awk ' {s+=$1} END { print s }' )
-        else
-            thisSize=$(du -sb build/portrom/images/${pname} |tr -cd 0-9)
-        fi
-        case $pname in
-            mi_ext) addSize=4194304 ;;
-            odm) addSize=34217728 ;;
-            system|vendor|system_ext) addSize=84217728 ;;
-            product) addSize=104217728 ;;
-            *) addSize=8554432 ;;
-        esac
-        if [ "$pack_type" = "EXT" ];then
-            for fstab in $(find build/portrom/images/${pname}/ -type f -name "fstab.*");do
-                #sed -i '/overlay/d' $fstab
-                sed -i '/system * erofs/d' $fstab
-                sed -i '/system_ext * erofs/d' $fstab
-                sed -i '/vendor * erofs/d' $fstab
-                sed -i '/product * erofs/d' $fstab
-            done
-            thisSize=$(echo "$thisSize + $addSize" |bc)
-            blue 以[$pack_type]文件系统打包[${pname}.img]大小[$thisSize] "Packing [${pname}.img]:[$pack_type] with size [$thisSize]"
-            python3 bin/fspatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_fs_config
-            python3 bin/contextpatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_file_contexts
-            make_ext4fs -J -T $(date +%s) -S build/portrom/images/config/${pname}_file_contexts -l $thisSize -C build/portrom/images/config/${pname}_fs_config -L ${pname} -a ${pname} build/portrom/images/${pname}.img build/portrom/images/${pname}
+green "开始打包镜像" "Packing img"
 
-            if [ -f "build/portrom/images/${pname}.img" ];then
-                green "成功以大小 [$thisSize] 打包 [${pname}.img] [${pack_type}] 文件系统" "Packing [${pname}.img] with [${pack_type}], size: [$thisSize] success"
-                #rm -rf build/baserom/images/${pname}
-            else
-                error "以 [${pack_type}] 文件系统打包 [${pname}] 分区失败" "Packing [${pname}] with[${pack_type}] filesystem failed!"
-            fi
+
+if [ "$pack_type" = "EXT" ];then
+    img_free() {
+    size_free="$(tune2fs -l build/portrom/images/${i}.img | awk '/Free blocks:/ { print $3 }')"
+    size_free="$(echo "$size_free / 4096 * 1024 * 1024" | bc)"
+    if [[ $size_free -ge 1073741824 ]]; then
+    File_Type=$(awk "BEGIN{print $size_free/1073741824}")G
+    elif [[ $size_free -ge 1048576 ]]; then
+    File_Type=$(awk "BEGIN{print $size_free/1048576}")MB
+    elif [[ $size_free -ge 1024 ]]; then
+    File_Type=$(awk "BEGIN{print $size_free/1024}")kb
+    elif [[ $size_free -le 1024 ]]; then
+    File_Type=${size_free}b
+    fi
+    blue "${i}.img 剩余空间: $File_Type" "${i}.img remain space: $File_Type"
+    }
+    for i in ${super_list}; do
+        eval "$i"_size_orig=$(sudo du -sb build/portrom/images/$i | awk {'print $1'})
+        if [[ "$(eval echo "$"$i"_size_orig")" -lt "1048576" ]]; then
+        size=1048576
+        elif [[ "$(eval echo "$"$i"_size_orig")" -lt "104857600" ]]; then
+        size=$(echo "$(eval echo "$"$i"_size_orig") * 15 / 10 / 4096 * 4096" | bc)
+        elif [[ "$(eval echo "$"$i"_size_orig")" -lt "1073741824" ]]; then
+        size=$(echo "$(eval echo "$"$i"_size_orig") * 108 / 100 / 4096 * 4096" | bc)
         else
-            
+        size=$(echo "$(eval echo "$"$i"_size_orig") * 103 / 100 / 4096 * 4096" | bc)
+        fi
+        eval "$i"_size=$size
+    done
+    system_size=$(echo "$system_size * 4096 / 4096 / 4096" | bc)
+    vendor_size=$(echo "$vendor_size * 4096 / 4096 / 4096" | bc)
+    product_size=$(echo "$product_size * 4096 / 4096 / 4096" | bc)
+    odm_size=$(echo "$odm_size * 4096 / 4096 / 4096" | bc)
+    system_ext_size=$(echo "$system_ext_size * 4096 / 4096 / 4096" | bc)
+    mi_ext_size=$(echo "$mi_ext_size * 4096 / 4096 / 4096" | bc)
+    for i in ${super_list}; do
+        mkdir -p build/portrom/images/$i/lost+found
+        sudo touch -t 200901010000.00 build/portrom/images/$i/lost+found
+    done
+    for i in ${super_list}; do
+        blue "正在生成: $i " "Generating $i"
+        python3 bin/fspatch.py build/portrom/images/$i build/portrom/images/config/"$i"_fs_config
+        python3 bin/contextpatch.py build/portrom/images/$i build/portrom/images/config/"$i"_file_contexts
+        eval "$i"_inode=$(sudo cat build/portrom/images/config/"$i"_fs_config | wc -l)
+        eval "$i"_inode=$(echo "$(eval echo "$"$i"_inode") + 8" | bc)
+        mke2fs -O ^has_journal -L $i -I 256 -N $(eval echo "$"$i"_inode") -M /$i -m 0 -t ext4 -b 4096 build/portrom/images/$i.img $(eval echo "$"$i"_size") || false
+        if [[ "${ext_rw}" == "true" ]]; then
+        e2fsdroid -e -T 1230768000 -C build/portrom/images/config/"$i"_fs_config -S build/portrom/images/config/"$i"_file_contexts -f build/portrom/images/$i -a /$i build/portrom/images/$i.img || false
+        else
+        e2fsdroid -e -T 1230768000 -C build/portrom/images/config/"$i"_fs_config -S build/portrom/images/config/"$i"_file_contexts -f build/portrom/images/$i -a /$i -s build/portrom/images/$i.img || false
+        fi
+        if [[ "${ext_rw}" != "true" ]];then
+        resize2fs -f -M build/portrom/images/$i.img
+        fi
+        img_free
+        if [[ $i == mi_ext ]]; then
+        sudo rm -rf build/portrom/images/$i
+        continue
+        fi
+        size_free=$(tune2fs -l build/portrom/images/$i.img | awk '/Free blocks:/ { print $3}')
+        # 第二次打包 (不预留空间)
+        if [[ "$size_free" != 0 && "${Readaw}" != "true" ]]; then
+        size_free=$(echo "$size_free * 4096" | bc)
+        eval "$i"_size=$(du -sb build/portrom/images/$i.img | awk {'print $1'})
+        eval "$i"_size=$(echo "$(eval echo "$"$i"_size") - $size_free" | bc)
+        eval "$i"_size=$(echo "$(eval echo "$"$i"_size") * 4096 / 4096 / 4096" | bc)
+        sudo rm -rf build/portrom/images/$i.img
+        blue "二次生成: $i" "Regenerate $i"
+        mke2fs -O ^has_journal -L $i -I 256 -N $(eval echo "$"$i"_inode") -M /$i -m 0 -t ext4 -b 4096 build/portrom/images/$i.img $(eval echo "$"$i"_size") || false
+        if [[ "${ext_rw}" == "true" ]]; then
+            e2fsdroid -e -T 1230768000 -C build/portrom/images/config/"$i"_fs_config -S build/portrom/images/config/"$i"_file_contexts -f build/portrom/images/$i -a /$i build/portrom/images/$i.img || false
+        else
+            e2fsdroid -e -T 1230768000 -C build/portrom/images/config/"$i"_fs_config -S build/portrom/images/config/"$i"_file_contexts -f build/portrom/images/$i -a /$i -s build/portrom/images/$i.img || false
+        fi
+        resize2fs -f -M build/portrom/images/$i.img
+        fi
+        #sudo rm -rf build/portrom/images/$i
+    done
+    
+else
+    for pname in ${super_list};do
                 blue 以[$pack_type]文件系统打包[${pname}.img] "Packing [${pname}.img] with [$pack_type] filesystem"
                 python3 bin/fspatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_fs_config
                 python3 bin/contextpatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_file_contexts
@@ -1222,14 +1268,10 @@ for pname in ${super_list};do
                 else
                     error "以 [${pack_type}] 文件系统打包 [${pname}] 分区失败" "Faield to pack [${pname}]"
                     exit 1
-                fi
-        fi
-        unset fsType
-        unset thisSize
     fi
 done
+fi
 rm fstype.txt
-
 os_type="hyperos"
 if [[ ${is_eu_rom} == true ]];then
     os_type="xiaomi.eu"
