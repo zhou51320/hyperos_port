@@ -900,6 +900,18 @@ if [[ -f $targetFrameworkExtRes ]] && [[ ${port_android_version} != "15" ]]; the
     java -jar bin/apktool/APKEditor.jar b -i tmp/framework-ext-res -o tmp/$filename -f> /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
         cp -rf tmp/$filename $targetFrameworkExtRes
 fi
+
+targetMiLinkOS2APK=$(find build/portrom -type f -name "MiLinkOS2CN.apk")
+if [[ -f $targetMiLinkOS2APK ]];then
+    cp -rf $targetMiLinkOS2APK tmp/$(basename $targetMiLinkOS2APK).bak
+    java -jar bin/apktool/APKEditor.jar d -i $targetMiLinkOS2APK -o tmp/MiLinkOS2 -f > /dev/null 2>&1
+    targetsmali=$(find tmp/MiLinkOS2 -name "HMindManager.smali")
+    python3 bin/patchmethod.py -d tmp/MiLinkOS2 -k "isSupportCapability() context == null" -return true
+    python3 bin/patchmethod.py $targetsmali J -return true
+    java -jar bin/apktool/APKEditor.jar b -i tmp/MiLinkOS2 -o $targetMiLinkOS2APK -f > /dev/null 2>&1
+
+fi
+
 targetMIUIThemeManagerAPK=$(find build/portrom -type f -name "MIUIThemeManager.apk")
 if [[ -f $targetMIUIThemeManagerAPK ]];then
     cp -rf $targetMIUIThemeManagerAPK tmp/$(basename $targetMIUIThemeManagerAPK).bak
