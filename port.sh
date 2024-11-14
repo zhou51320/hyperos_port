@@ -628,6 +628,20 @@ else
         { sed -i "${orginal_line_number},${move_result_end_line}d" "$smali_file" && sed -i "${orginal_line_number}i\\${replace_with_command}" "$smali_file"; } &&    blue "${smali_file}  修改成功" "${smali_file} patched"
         old_smali_dir=$smali_dir
     done < <(find tmp/services/smali/*/com/android/server/pm/ tmp/services/smali/*/com/android/server/pm/pkg/parsing/ -maxdepth 1 -type f -name "*.smali" -exec grep -H "$target_method" {} \; | cut -d ':' -f 1)
+    
+    target_canJoinSharedUserId_method='canJoinSharedUserId' 
+    find tmp/services/ -type f -name "ReconcilePackageUtils.smali" | while read smali_file; do
+        cp -rfv $smali_file tmp/
+        method_line=$(grep -n "$target_canJoinSharedUserId_method" "$smali_file" | cut -d ':' -f 1)
+
+        register_number=$(tail -n +"$method_line" "$smali_file" | grep -m 1 "move-result" | tr -dc '0-9')
+
+        move_result_end_line=$(awk -v ML=$method_line 'NR>=ML && /move-result /{print NR; exit}' "$smali_file")
+
+        replace_with_command="const/4 v${register_number}, 0x1"
+
+        { sed -i "${method_line},${move_result_end_line}d" "$smali_file" && sed -i "${method_line}i\\${replace_with_command}" "$smali_file"; }
+    done
     java -jar bin/apktool/APKEditor.jar b -f -i tmp/services -o tmp/services_patched.jar > /dev/null 2>&1
     cp -rf tmp/services_patched.jar build/portrom/images/system/system/framework/services.jar
     
