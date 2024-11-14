@@ -878,16 +878,17 @@ fi
 
 unlock_device_feature "whether support fps change " "bool" "support_smart_fps"
 unlock_device_feature "smart fps value" "integer" "smart_fps_value" "${maxFps}"
-if [[ ${port_android_version} != "15" ]];then
-patch_smali "PowerKeeper.apk" "DisplayFrameSetting.smali" "unicorn" "umi"
+
+if [[ ${base_rom_code} == "munch" ]];then
+    unlock_device_feature "whether support dc backlight " "bool" "support_dc_backlight"
+    unlock_device_feature "whether backlight bit switch " "bool" "support_backlight_bit_switch"
 fi
+patch_smali "PowerKeeper.apk" "DisplayFrameSetting.smali" "unicorn" "umi"
 if [[ ${is_eu_rom} == true ]];then
     patch_smali "MiSettings.apk" "NewRefreshRateFragment.smali" "const-string v1, \"btn_preferce_category\"" "const-string v1, \"btn_preferce_category\"\n\n\tconst\/16 p1, 0x1"
 
 else
-    if [[ ${port_android_version} != "15" ]];then
     patch_smali "MISettings.apk" "NewRefreshRateFragment.smali" "const-string v1, \"btn_preferce_category\"" "const-string v1, \"btn_preferce_category\"\n\n\tconst\/16 p1, 0x1"
-    fi
 fi
 # Unlock eyecare mode 
 unlock_device_feature "default rhythmic eyecare mode" "integer" "default_eyecare_mode" "2"
