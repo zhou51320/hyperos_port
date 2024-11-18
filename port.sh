@@ -20,7 +20,7 @@ portrom="$2"
 
 work_dir=$(pwd)
 tools_dir=${work_dir}/bin/$(uname)/$(uname -m)
-export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$PATH
+export PATH=$(pwd)/bin/$(uname)/$(uname -m)/:$(pwd)/otatools/bin:$PATH
 
 # Import functions
 source functions.sh
@@ -154,7 +154,7 @@ mkdir -p build/portrom/images/
 # 提取分区
 if [[ ${baserom_type} == 'payload' ]];then
     blue "正在提取底包 [payload.bin]" "Extracting files from BASEROM [payload.bin]"
-    unzip ${baserom} payload.bin -d build/baserom > /dev/null 2>&1 ||error "解压底包 [payload.bin] 时出错" "Extracting [payload.bin] error"
+    payload-dumper --out build/baserom/images/ $baserom
     green "底包 [payload.bin] 提取完毕" "[payload.bin] extracted."
 elif [[ ${baserom_type} == 'br' ]];then
     blue "正在提取底包 [new.dat.br]" "Extracting files from BASEROM [*.new.dat.br]"
@@ -196,16 +196,11 @@ elif [[ ${portrom_type} == "fastboot" ]];then
     green "移植包 [super.img] 提取完毕" "[super.img] extracted."
 else
     blue "正在提取移植包 [payload.bin]" "Extracting files from PORTROM [payload.bin]"
-    unzip ${portrom} payload.bin -d build/portrom  > /dev/null 2>&1 ||error "解压移植包 [payload.bin] 时出错"  "Extracting [payload.bin] error"
+    payload-dumper --partitions system,product,system_ext,mi_ext --out build/portrom/images/ $portrom
     green "移植包 [payload.bin] 提取完毕" "[payload.bin] extracted."
 fi
 
-if [[ ${baserom_type} == 'payload' ]];then
-
-    blue "开始分解底包 [payload.bin]" "Unpacking BASEROM [payload.bin]"
-    payload-dumper-go -o build/baserom/images/ build/baserom/payload.bin >/dev/null 2>&1 ||error "分解底包 [payload.bin] 时出错" "Unpacking [payload.bin] failed"
-
-elif [[ ${is_base_rom_eu} == true ]];then
+if [[ ${is_base_rom_eu} == true ]];then
     blue "开始分解底包 [super.img]" "Unpacking BASEROM [super.img]"
     super_list=$(python3 bin/lpunpack.py --info build/baserom/super.img | grep "super:" | awk '{ print $5 }')
     for i in ${super_list}; do
@@ -271,10 +266,6 @@ for part in ${super_list};do
             blue "lpunpack.py PORTROM super.img ${part}_a"
             python3 bin/lpunpack.py -p ${part}_a build/portrom/super.img build/portrom/images 
             mv build/portrom/images/${part}_a.img build/portrom/images/${part}.img
-        else
-            blue "payload.bin 提取 [${part}] 分区..." "Extracting [${part}] from PORTROM payload.bin"
-
-            payload-dumper-go -p ${part} -o build/portrom/images/ build/portrom/payload.bin >/dev/null 2>&1 || error "提取移植包 [${part}] 分区时出错" "Extracting partition [${part}] error."
         fi
     extract_partition "${work_dir}/build/portrom/images/${part}.img" "${work_dir}/build/portrom/images/"
     else
@@ -318,7 +309,8 @@ fi
 green "ROM 版本: 底包为 [${base_rom_version}], 移植包为 [${port_rom_version}]" "ROM Version: BASEROM: [${base_rom_version}], PORTROM: [${port_rom_version}] "
 
 # 代号
-base_rom_code=$(< build/portrom/images/vendor/build.prop grep "ro.product.vendor.device" |awk 'NR==1' |cut -d '=' -f 2)
+#base_rom_code=$(< build/portrom/images/vendor/build.prop grep "ro.product.vendor.device" |awk 'NR==1' |cut -d '=' -f 2)
+base_rom_code=$(basename build/baserom/images/product/etc/device_features/*.xml .xml)
 port_rom_code=$(< build/portrom/images/product/etc/build.prop grep "ro.product.product.name" |awk 'NR==1' |cut -d '=' -f 2)
 green "机型代号: 底包为 [${base_rom_code}], 移植包为 [${port_rom_code}]" "Device Code: BASEROM: [${base_rom_code}], PORTROM: [${port_rom_code}]"
 
@@ -495,6 +487,7 @@ if [[ -f $targetAospFrameworkResOverlay ]]; then
     if [[ $port_android_version == "15" ]]; then
         blue "Fix VanillaIceCream brightness" 
         for xml in $(find tmp/$targetDir -type f -name "*.xml");do
+            sed -i "s/config_screenBrightnessDim\"/config_screenBrightnessDim_hyper\"/g" $xml
             sed -i "s/config_screenBrightnessSettingDefault\"/config_screenBrightnessSettingDefault_hyper\"/g" $xml
             sed -i "s/config_screenBrightnessSettingMaximum\"/config_screenBrightnessSettingMaximum_hyper\"/g" $xml
             sed -i "s/config_screenBrightnessSettingMinimum\"/config_screenBrightnessSettingMinimum_hyper\"/g" $xml 
@@ -503,6 +496,28 @@ if [[ -f $targetAospFrameworkResOverlay ]]; then
     bin/apktool/apktool b tmp/$targetDir -o tmp/$filename > /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
     cp -rf tmp/$filename $targetAospFrameworkResOverlay
 fi
+
+sourceMiuiFrameworkTelephonyResOverlay=$(find build/baserom/images/product -type f -name "MiuiFrameworkTelephonyResOverlay.apk")
+targetMiuiFrameworkTelephonyResOverlay=$(find build/portrom/images/product -type f -name "MiuiFrameworkTelephonyResOverlay.apk")
+if [[ ! -f $sourceMiuiFrameworkTelephonyResOverlay ]]; then
+    
+    if [[ ! -d tmp ]]; then
+     mkdir tmp
+    fi
+    filename=$(basename $targetMiuiFrameworkTelephonyResOverlay)
+    targetDir=$(echo "$filename" | sed 's/\..*$//')
+   bin/apktool/apktool d $targetMiuiFrameworkTelephonyResOverlay -o tmp/$targetDir -f > /dev/null 2>&1
+    if [[ $port_android_version == "15" ]]; then
+        for xml in $(find tmp/$targetDir -type f -name "*.xml");do
+            sed -i 's|<bool name="config_roaming_optimization_supported">true</bool>|<bool name="config_roaming_optimization_supported">false</bool>|g' "$xml"
+        done 
+    fi
+    bin/apktool/apktool b tmp/$targetDir -o tmp/$filename > /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
+    cp -rf tmp/$filename $targetMiuiFrameworkTelephonyResOverlay
+else
+    cp -rf $sourceMiuiFrameworkTelephonyResOverlay $targetMiuiFrameworkTelephonyResOverlay
+fi
+
 
 #其他机型可能没有default.prop
 for prop_file in $(find build/portrom/images/vendor/ -name "*.prop"); do
@@ -524,7 +539,17 @@ if [ $(grep -c "sm8250" "build/portrom/images/vendor/build.prop") -ne 0 ]; then
     ## Fix the drop frame issus
     echo "ro.surface_flinger.enable_frame_rate_override=false" >> build/portrom/images/vendor/build.prop
     echo "ro.vendor.display.mode_change_optimize.enable=true" >> build/portrom/images/vendor/build.prop
-
+   if [[ $port_android_version == "15" ]];then
+          {
+            echo " ro.miui.affinity.sfui=4-7"
+            echo "ro.miui.affinity.sfre=4-7" 
+            echo "ro.miui.affinity.sfuireset=4-7" 
+            echo "persist.sys.miui_animator_sched.bigcores=4-7"
+            echo "persist.sys.miui_animator_sched.big_prime_cores=4-7"
+            echo "persist.vendor.display.miui.composer_boost=4-7"
+        }  >> build/portrom/images/product/etc/build.prop
+	
+   else
     sed -i "s/persist.sys.miui_animator_sched.bigcores=.*/persist.sys.miui_animator_sched.bigcores=4-6/" build/portrom/images/product/etc/build.prop
     sed -i "s/persist.sys.miui_animator_sched.big_prime_cores=.*/persist.sys.miui_animator_sched.big_prime_cores=4-7/" build/portrom/images/product/etc/build.prop
 
@@ -536,6 +561,8 @@ if [ $(grep -c "sm8250" "build/portrom/images/vendor/build.prop") -ne 0 ]; then
         echo "persist.vendor.display.miui.composer_boost=4-7"
     }  >> build/portrom/images/product/etc/build.prop
 
+
+    fi
 fi
 # props from k60
 echo "persist.vendor.mi_sf.optimize_for_refresh_rate.enable=1" >> build/portrom/images/vendor/build.prop
@@ -613,6 +640,20 @@ else
         { sed -i "${orginal_line_number},${move_result_end_line}d" "$smali_file" && sed -i "${orginal_line_number}i\\${replace_with_command}" "$smali_file"; } &&    blue "${smali_file}  修改成功" "${smali_file} patched"
         old_smali_dir=$smali_dir
     done < <(find tmp/services/smali/*/com/android/server/pm/ tmp/services/smali/*/com/android/server/pm/pkg/parsing/ -maxdepth 1 -type f -name "*.smali" -exec grep -H "$target_method" {} \; | cut -d ':' -f 1)
+    
+    target_canJoinSharedUserId_method='canJoinSharedUserId' 
+    find tmp/services/ -type f -name "ReconcilePackageUtils.smali" | while read smali_file; do
+        cp -rfv $smali_file tmp/
+        method_line=$(grep -n "$target_canJoinSharedUserId_method" "$smali_file" | cut -d ':' -f 1)
+
+        register_number=$(tail -n +"$method_line" "$smali_file" | grep -m 1 "move-result" | tr -dc '0-9')
+
+        move_result_end_line=$(awk -v ML=$method_line 'NR>=ML && /move-result /{print NR; exit}' "$smali_file")
+
+        replace_with_command="const/4 v${register_number}, 0x1"
+
+        { sed -i "${method_line},${move_result_end_line}d" "$smali_file" && sed -i "${method_line}i\\${replace_with_command}" "$smali_file"; }
+    done
     java -jar bin/apktool/APKEditor.jar b -f -i tmp/services -o tmp/services_patched.jar > /dev/null 2>&1
     cp -rf tmp/services_patched.jar build/portrom/images/system/system/framework/services.jar
     
@@ -812,6 +853,10 @@ unlock_device_feature "device support screen enhance engine"  "bool" "support_sc
 unlock_device_feature "Whether suppot Android Flashlight Controller"  "bool" "support_android_flashlight"
 unlock_device_feature "Whether support SR for image display"  "bool" "support_SR_for_image_display"
 
+unlock_device_feature "whether the device aod need grayscale" "bool" "is_aod_need_grayscale"
+
+unlock_device_feature "whether the device supports aod fullscreen mode" "bool" "support_aod_fullscreen"
+unlock_device_feature "whether the device supports aod aon mode" "bool" "support_aod_aon"
 # Unlock MEMC; unlocking the screen enhance engine is a prerequisite.
 # This feature add additional frames to videos to make content appear smooth and transitions lively.
 if  grep -q "ro.vendor.media.video.frc.support" build/portrom/images/vendor/build.prop ;then
@@ -833,16 +878,17 @@ fi
 
 unlock_device_feature "whether support fps change " "bool" "support_smart_fps"
 unlock_device_feature "smart fps value" "integer" "smart_fps_value" "${maxFps}"
-if [[ ${port_android_version} != "15" ]];then
-patch_smali "PowerKeeper.apk" "DisplayFrameSetting.smali" "unicorn" "umi"
+
+if [[ ${base_rom_code} == "munch" ]];then
+    unlock_device_feature "whether support dc backlight " "bool" "support_dc_backlight"
+    unlock_device_feature "whether backlight bit switch " "bool" "support_backlight_bit_switch"
 fi
+patch_smali "PowerKeeper.apk" "DisplayFrameSetting.smali" "unicorn" "umi"
 if [[ ${is_eu_rom} == true ]];then
     patch_smali "MiSettings.apk" "NewRefreshRateFragment.smali" "const-string v1, \"btn_preferce_category\"" "const-string v1, \"btn_preferce_category\"\n\n\tconst\/16 p1, 0x1"
 
 else
-    if [[ ${port_android_version} != "15" ]];then
     patch_smali "MISettings.apk" "NewRefreshRateFragment.smali" "const-string v1, \"btn_preferce_category\"" "const-string v1, \"btn_preferce_category\"\n\n\tconst\/16 p1, 0x1"
-    fi
 fi
 # Unlock eyecare mode 
 unlock_device_feature "default rhythmic eyecare mode" "integer" "default_eyecare_mode" "2"
@@ -866,6 +912,36 @@ if [[ -f $targetFrameworkExtRes ]] && [[ ${port_android_version} != "15" ]]; the
     filename=$(basename $targetFrameworkExtRes)
     java -jar bin/apktool/APKEditor.jar b -i tmp/framework-ext-res -o tmp/$filename -f> /dev/null 2>&1 || error "apktool 打包失败" "apktool mod failed"
         cp -rf tmp/$filename $targetFrameworkExtRes
+fi
+
+targetMiLinkOS2APK=$(find build/portrom -type f -name "MiLinkOS2CN.apk")
+if [[ -f $targetMiLinkOS2APK ]];then
+    cp -rf $targetMiLinkOS2APK tmp/$(basename $targetMiLinkOS2APK).bak
+    java -jar bin/apktool/APKEditor.jar d -i $targetMiLinkOS2APK -o tmp/MiLinkOS2 -f > /dev/null 2>&1
+    targetsmali=$(find tmp/MiLinkOS2 -name "HMindManager.smali")
+    python3 bin/patchmethod.py -d tmp/MiLinkOS2 -k "isSupportCapability() context == null" -return true
+    python3 bin/patchmethod.py $targetsmali J -return true
+    java -jar bin/apktool/APKEditor.jar b -i tmp/MiLinkOS2 -o $targetMiLinkOS2APK -f > /dev/null 2>&1
+
+fi
+
+targetMIUIThemeManagerAPK=$(find build/portrom -type f -name "MIUIThemeManager.apk")
+if [[ -f $targetMIUIThemeManagerAPK ]];then
+    cp -rf $targetMIUIThemeManagerAPK tmp/$(basename $targetMIUIThemeManagerAPK).bak
+    java -jar bin/apktool/APKEditor.jar d -i $targetMIUIThemeManagerAPK -o tmp/MIUIThemeManager -f > /dev/null 2>&1
+    targetsmali=$(find tmp/ -name "o1t.smali" -path "*/basemodule/utils/*")
+    python3 bin/patchmethod.py $targetsmali mcp -return true
+    java -jar bin/apktool/APKEditor.jar b -i tmp/MIUIThemeManager -o $targetMIUIThemeManagerAPK -f > /dev/null 2>&1
+
+fi
+
+targetSettingsAPK=$(find build/portrom -type f -name "Settings.apk")
+if [[ -f $targetSettingsAPK ]];then
+    cp -rf $targetSettingsAPK tmp/$(basename $targetSettingsAPK).bak
+    java -jar bin/apktool/APKEditor.jar d -i $targetSettingsAPK -o tmp/Settings -f > /dev/null 2>&1
+    targetsmali=$(find tmp/ -type f -path "*/com/android/settings/InternalDeviceUtils.smali")
+    python3 bin/patchmethod.py $targetsmali isAiSupported -return true
+    java -jar bin/apktool/APKEditor.jar b -i tmp/Settings -o $targetSettingsAPK -f > /dev/null 2>&1
 fi
 
 if [[ ${port_rom_code} == "munch_cn" ]];then
@@ -988,9 +1064,6 @@ cp -rf $sourceAnimationZIP $targetAnimationZIP
 if [[ -d "devices/common" ]];then
     commonCamera=$(find devices/common -type f -name "MiuiCamera.apk")
     targetCamera=$(find build/portrom/images/product -type d -name "MiuiCamera")
-    
-    MiLinkCirculateMIUI15=$(find devices/common -type d -name "MiLinkCirculate*" )
-    targetMiLinkCirculateMIUI15=$(find build/portrom/images/product -type d -name "MiLinkCirculate*")
     targetNQNfcNci=$(find build/portrom/images/system/system build/portrom/images/product build/portrom/images/system_ext -type d -name "NQNfcNci*")
 
     
@@ -1004,8 +1077,11 @@ if [[ -d "devices/common" ]];then
     elif [[ $nfc_fix_type == "a14" ]]; then
         unzip -oq devices/common/nfc_a14.zip -d build/portrom/images/
         echo "ro.vendor.nfc.dispatch_optim=1" >> build/portrom/images/vendor/build.prop
+    elif [[ ${port_android_version} == "15" ]]; then
+        unzip -oq devices/common/nfc_a15.zip -d build/portrom/images/
+        echo "ro.vendor.nfc.dispatch_optim=1" >> build/portrom/images/vendor/build.prop
     fi
-    if [[ $base_device_code == "munch" ]] && [[ ${port_android_version} == "15" ]]; then
+    if [[ $base_rom_code == "munch" ]] && [[ ${port_android_version} == "15" ]]; then
         sourceCamera=$(find build/baserom/images/ -type f -name "MiuiCamera.apk")
         targetCamera=$(find build/portrom/images/ -type d -name "MiuiCamera")
         cp -rf $sourceCamera $targetCamera/
@@ -1018,18 +1094,8 @@ if [[ -d "devices/common" ]];then
         fi
         cp -rf $commonCamera $targetCamera
     fi
-    if [[ -f "$bootAnimationZIP" ]];then
-        yellow "替换开机第二屏动画" "Repacling bootanimation.zip"
-        cp -rf $bootAnimationZIP $targetAnimationZIP
     fi
-    fi
-    if [[ -d "$targetMiLinkCirculateMIUI15" ]]; then
-        rm -rf $targetMiLinkCirculateMIUI15/*
-        cp -rf $MiLinkCirculateMIUI15 $targetMiLinkCirculateMIUI15
-    else
-        mkdir -p build/portrom/images/product/app/MiLinkCirculateMIUI15
-        cp -rf $MiLinkCirculateMIUI15 build/portrom/images/product/app/
-    fi
+    
 fi
 
 #Devices/机型代码/overaly 按照镜像的目录结构，可直接替换目标。
@@ -1121,43 +1187,89 @@ done
 echo "${pack_type}">fstype.txt
 superSize=$(bash bin/getSuperSize.sh $device_code)
 green "Super大小为${superSize}" "Super image size: ${superSize}"
-green "开始打包镜像" "Packing super.img"
-for pname in ${super_list};do
-    if [ -d "build/portrom/images/$pname" ];then
-        if [[ "$OSTYPE" == "darwin"* ]];then
-            thisSize=$(find build/portrom/images/${pname} | xargs stat -f%z | awk ' {s+=$1} END { print s }' )
-        else
-            thisSize=$(du -sb build/portrom/images/${pname} |tr -cd 0-9)
-        fi
-        case $pname in
-            mi_ext) addSize=4194304 ;;
-            odm) addSize=34217728 ;;
-            system|vendor|system_ext) addSize=84217728 ;;
-            product) addSize=104217728 ;;
-            *) addSize=8554432 ;;
-        esac
-        if [ "$pack_type" = "EXT" ];then
-            for fstab in $(find build/portrom/images/${pname}/ -type f -name "fstab.*");do
-                #sed -i '/overlay/d' $fstab
-                sed -i '/system * erofs/d' $fstab
-                sed -i '/system_ext * erofs/d' $fstab
-                sed -i '/vendor * erofs/d' $fstab
-                sed -i '/product * erofs/d' $fstab
-            done
-            thisSize=$(echo "$thisSize + $addSize" |bc)
-            blue 以[$pack_type]文件系统打包[${pname}.img]大小[$thisSize] "Packing [${pname}.img]:[$pack_type] with size [$thisSize]"
-            python3 bin/fspatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_fs_config
-            python3 bin/contextpatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_file_contexts
-            make_ext4fs -J -T $(date +%s) -S build/portrom/images/config/${pname}_file_contexts -l $thisSize -C build/portrom/images/config/${pname}_fs_config -L ${pname} -a ${pname} build/portrom/images/${pname}.img build/portrom/images/${pname}
+green "开始打包镜像" "Packing img"
 
-            if [ -f "build/portrom/images/${pname}.img" ];then
-                green "成功以大小 [$thisSize] 打包 [${pname}.img] [${pack_type}] 文件系统" "Packing [${pname}.img] with [${pack_type}], size: [$thisSize] success"
-                #rm -rf build/baserom/images/${pname}
-            else
-                error "以 [${pack_type}] 文件系统打包 [${pname}] 分区失败" "Packing [${pname}] with[${pack_type}] filesystem failed!"
-            fi
+
+if [ "$pack_type" = "EXT" ];then
+    img_free() {
+    size_free="$(tune2fs -l build/portrom/images/${i}.img | awk '/Free blocks:/ { print $3 }')"
+    size_free="$(echo "$size_free / 4096 * 1024 * 1024" | bc)"
+    if [[ $size_free -ge 1073741824 ]]; then
+    File_Type=$(awk "BEGIN{print $size_free/1073741824}")G
+    elif [[ $size_free -ge 1048576 ]]; then
+    File_Type=$(awk "BEGIN{print $size_free/1048576}")MB
+    elif [[ $size_free -ge 1024 ]]; then
+    File_Type=$(awk "BEGIN{print $size_free/1024}")kb
+    elif [[ $size_free -le 1024 ]]; then
+    File_Type=${size_free}b
+    fi
+    blue "${i}.img 剩余空间: $File_Type" "${i}.img remain space: $File_Type"
+    }
+    for i in ${super_list}; do
+        eval "$i"_size_orig=$(sudo du -sb build/portrom/images/$i | awk {'print $1'})
+        if [[ "$(eval echo "$"$i"_size_orig")" -lt "1048576" ]]; then
+        size=1048576
+        elif [[ "$(eval echo "$"$i"_size_orig")" -lt "104857600" ]]; then
+        size=$(echo "$(eval echo "$"$i"_size_orig") * 15 / 10 / 4096 * 4096" | bc)
+        elif [[ "$(eval echo "$"$i"_size_orig")" -lt "1073741824" ]]; then
+        size=$(echo "$(eval echo "$"$i"_size_orig") * 108 / 100 / 4096 * 4096" | bc)
         else
-            
+        size=$(echo "$(eval echo "$"$i"_size_orig") * 103 / 100 / 4096 * 4096" | bc)
+        fi
+        eval "$i"_size=$size
+    done
+    system_size=$(echo "$system_size * 4096 / 4096 / 4096" | bc)
+    vendor_size=$(echo "$vendor_size * 4096 / 4096 / 4096" | bc)
+    product_size=$(echo "$product_size * 4096 / 4096 / 4096" | bc)
+    odm_size=$(echo "$odm_size * 4096 / 4096 / 4096" | bc)
+    system_ext_size=$(echo "$system_ext_size * 4096 / 4096 / 4096" | bc)
+    mi_ext_size=$(echo "$mi_ext_size * 4096 / 4096 / 4096" | bc)
+    for i in ${super_list}; do
+        mkdir -p build/portrom/images/$i/lost+found
+        sudo touch -t 200901010000.00 build/portrom/images/$i/lost+found
+    done
+    for i in ${super_list}; do
+        blue "正在生成: $i " "Generating $i"
+        python3 bin/fspatch.py build/portrom/images/$i build/portrom/images/config/"$i"_fs_config
+        python3 bin/contextpatch.py build/portrom/images/$i build/portrom/images/config/"$i"_file_contexts
+        eval "$i"_inode=$(sudo cat build/portrom/images/config/"$i"_fs_config | wc -l)
+        eval "$i"_inode=$(echo "$(eval echo "$"$i"_inode") + 8" | bc)
+        mke2fs -O ^has_journal -L $i -I 256 -N $(eval echo "$"$i"_inode") -M /$i -m 0 -t ext4 -b 4096 build/portrom/images/$i.img $(eval echo "$"$i"_size") || false
+        if [[ "${ext_rw}" == "true" ]]; then
+        e2fsdroid -e -T 1230768000 -C build/portrom/images/config/"$i"_fs_config -S build/portrom/images/config/"$i"_file_contexts -f build/portrom/images/$i -a /$i build/portrom/images/$i.img || false
+        else
+        e2fsdroid -e -T 1230768000 -C build/portrom/images/config/"$i"_fs_config -S build/portrom/images/config/"$i"_file_contexts -f build/portrom/images/$i -a /$i -s build/portrom/images/$i.img || false
+        fi
+        if [[ "${ext_rw}" != "true" ]];then
+        resize2fs -f -M build/portrom/images/$i.img
+        fi
+        img_free
+        if [[ $i == mi_ext ]]; then
+        sudo rm -rf build/portrom/images/$i
+        continue
+        fi
+        size_free=$(tune2fs -l build/portrom/images/$i.img | awk '/Free blocks:/ { print $3}')
+        # 第二次打包 (不预留空间)
+        if [[ "$size_free" != 0 && "${Readaw}" != "true" ]]; then
+        size_free=$(echo "$size_free * 4096" | bc)
+        eval "$i"_size=$(du -sb build/portrom/images/$i.img | awk {'print $1'})
+        eval "$i"_size=$(echo "$(eval echo "$"$i"_size") - $size_free" | bc)
+        eval "$i"_size=$(echo "$(eval echo "$"$i"_size") * 4096 / 4096 / 4096" | bc)
+        sudo rm -rf build/portrom/images/$i.img
+        blue "二次生成: $i" "Regenerate $i"
+        mke2fs -O ^has_journal -L $i -I 256 -N $(eval echo "$"$i"_inode") -M /$i -m 0 -t ext4 -b 4096 build/portrom/images/$i.img $(eval echo "$"$i"_size") || false
+        if [[ "${ext_rw}" == "true" ]]; then
+            e2fsdroid -e -T 1230768000 -C build/portrom/images/config/"$i"_fs_config -S build/portrom/images/config/"$i"_file_contexts -f build/portrom/images/$i -a /$i build/portrom/images/$i.img || false
+        else
+            e2fsdroid -e -T 1230768000 -C build/portrom/images/config/"$i"_fs_config -S build/portrom/images/config/"$i"_file_contexts -f build/portrom/images/$i -a /$i -s build/portrom/images/$i.img || false
+        fi
+        resize2fs -f -M build/portrom/images/$i.img
+        fi
+        #sudo rm -rf build/portrom/images/$i
+    done
+    
+else
+    for pname in ${super_list};do
                 blue 以[$pack_type]文件系统打包[${pname}.img] "Packing [${pname}.img] with [$pack_type] filesystem"
                 python3 bin/fspatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_fs_config
                 python3 bin/contextpatch.py build/portrom/images/${pname} build/portrom/images/config/${pname}_file_contexts
@@ -1169,14 +1281,10 @@ for pname in ${super_list};do
                 else
                     error "以 [${pack_type}] 文件系统打包 [${pname}] 分区失败" "Faield to pack [${pname}]"
                     exit 1
-                fi
-        fi
-        unset fsType
-        unset thisSize
     fi
 done
+fi
 rm fstype.txt
-
 os_type="hyperos"
 if [[ ${is_eu_rom} == true ]];then
     os_type="xiaomi.eu"
